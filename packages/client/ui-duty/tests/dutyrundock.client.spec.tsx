@@ -40,8 +40,9 @@ describe('DutyRunDock', () => {
 
   it('renders nothing when the projection has no run binding', () => {
     const actions = makeActions()
+    const unboundState: DutyRunMachineState = { steps: [] }
     const unbound = render(<DutyRunDock
-      {...({ useProjection: () => makeState({ bound: undefined }), ...actions, t } as unknown as DutyRunDockProps)}
+      {...({ useProjection: () => unboundState, ...actions, t } as unknown as DutyRunDockProps)}
     />)
     expect(unbound.container.firstChild).toBeNull()
   })
