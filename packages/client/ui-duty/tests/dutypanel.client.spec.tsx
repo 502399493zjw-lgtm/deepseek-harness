@@ -144,6 +144,78 @@ describe('DutyPanel', () => {
     })
   })
 
+  it('shows a paused duty with its activate row and no outcome suffix', async () => {
+    const actions = makeActions({ listDuties: vi.fn(() => Promise.resolve([makeDuty({
+      state: {
+        dutyId: 'd1' as never,
+        lifecycle: 'paused',
+        pausedReason: 'human',
+        runCount: 0,
+        running: false,
+        consecutiveFailures: 0,
+      },
+    })])) })
+    renderPanel(actions)
+    await waitFor(() => {
+      expect(screen.getByText('Triage tickets')).toBeTruthy()
+    })
+    expect(screen.getByText(/状态: paused$/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '激活' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '激活' }))
+    await waitFor(() => {
+      expect(actions.setLifecycle).toHaveBeenCalledWith('d1' as never, 'active')
+    })
+  })
+
+  it('hides the activate row for an archived duty and renders a run without summary', async () => {
+    const actions = makeActions({
+      listDuties: vi.fn(() => Promise.resolve([makeDuty({
+        state: {
+          dutyId: 'd1' as never,
+          lifecycle: 'archived',
+          runCount: 1,
+          running: false,
+          consecutiveFailures: 0,
+        },
+      })])),
+      listRuns: vi.fn(() => Promise.resolve([{
+        id: 'r1' as never,
+        dutyId: 'd1' as never,
+        index: 1,
+        sessionId: 's1' as never,
+        cause: { kind: 'schedule' as const, reason: 'hourly' },
+        status: 'failed' as const,
+        startedAt: 1,
+        adapted: false,
+      }])),
+    })
+    renderPanel(actions)
+    await waitFor(() => {
+      expect(screen.getByText('Triage tickets')).toBeTruthy()
+    })
+    expect(screen.queryByRole('button', { name: '激活' })).toBeNull()
+    fireEvent.click(screen.getByText('Triage tickets'))
+    await waitFor(() => {
+      expect(screen.getByText('#1 failed')).toBeTruthy()
+    })
+    expect(screen.getByText('hourly')).toBeTruthy()
+  })
+
+  it('falls back to the generic copy when a verb fails without a message', async () => {
+    const actions = makeActions({
+      listDuties: vi.fn(() => Promise.resolve([makeDuty()])),
+      setLifecycle: vi.fn(() => Promise.resolve({ ok: false })),
+    })
+    renderPanel(actions)
+    await waitFor(() => {
+      expect(screen.getByText('Triage tickets')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: '暂停' }))
+    await waitFor(() => {
+      expect(screen.getByText('远端调用失败')).toBeTruthy()
+    })
+  })
+
   it('shows an inline failure from a rejected verb', async () => {
     const actions = makeActions({
       listDuties: vi.fn(() => Promise.resolve([makeDuty()])),
