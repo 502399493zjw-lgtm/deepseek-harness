@@ -628,7 +628,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the frozen recorded event.',
       },
       {
-        signature: '@Remote(\'start\') async start(id: DutyId, reason: string): Promise< { ok: true, runId: DutyRunId } | { ok: false, code: string, error: string } >',
+        signature: '@Remote(\'start\') async start(id: DutyId, reason: string): Promise< { ok: true; runId: DutyRunId } | { ok: false; code: string; error: string } >',
         description: 'Wake one active Duty by hand through the optional run runtime. The Duty domain itself never starts a run: the runtime owns Session and Agent creation, so this verb reports a missing runtime instead of executing.',
         parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'reason', description: 'Why a human or model asked for this run.' }],
         returns: 'the started run id, or a named failure when no runtime is loaded or the Duty cannot run.',
@@ -653,9 +653,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Runtime that turns observations into runs and drives each run\'s Session to a terminal outcome. One claim from `ctx.duties` admits exactly one run; everything after the claim is this service\'s own machine.',
     methods: [
       {
-        signature: 'async startRun(dutyId: DutyId, cause: DutyRunCause): Promise<DutyRun>',
+        signature: 'async startRun(dutyId: DutyId, cause: DutyRunCause, options: { readonly wait?: boolean } = {}): Promise<DutyRun>',
         description: 'Start one run by hand, bypassing the trigger seam.',
-        parameters: [{ name: 'dutyId', description: 'The Duty to run.' }, { name: 'cause', description: 'Why a human or model asked for this run.' }],
+        parameters: [{ name: 'dutyId', description: 'The Duty to run.' }, { name: 'cause', description: 'Why a human or model asked for this run.' }, { name: 'options', description: '`wait` resolves only after the run settles, so a foreground caller observes the outcome rather than just the admission.' }],
         returns: 'the started run.',
       },
     ],
@@ -3066,7 +3066,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CreateDutyRequest',
-    declaration: 'export interface CreateDutyRequest {\n    readonly title: string;\n    readonly goal: string;\n    readonly scope?: string;\n    readonly trigger: DutyTrigger;\n    readonly body: DutyBody;\n    readonly toolPolicy: DutyToolPolicy;\n    readonly limits?: Partial<DutyLimits>;\n    readonly escalation?: readonly string[];\n    readonly reporting?: string;\n    readonly projectId?: string;\n}',
+    declaration: 'export interface CreateDutyRequest {\n    readonly id?: string;\n    readonly title: string;\n    readonly goal: string;\n    readonly scope?: string;\n    readonly trigger: DutyTrigger;\n    readonly body: DutyBody;\n    readonly toolPolicy: DutyToolPolicy;\n    readonly limits?: Partial<DutyLimits>;\n    readonly escalation?: readonly string[];\n    readonly reporting?: string;\n    readonly projectId?: string;\n}',
   },
   {
     name: 'CreateGoalRequest',

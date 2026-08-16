@@ -196,7 +196,7 @@ async recordTrigger(event: { readonly dutyId: DutyId readonly cause: DutyRunCaus
  * @returns the started run id, or a named failure when no runtime is
  * loaded or the Duty cannot run.
  */
-@Remote('start') async start(id: DutyId, reason: string): Promise< { ok: true, runId: DutyRunId } | { ok: false, code: string, error: string } >
+@Remote('start') async start(id: DutyId, reason: string): Promise< { ok: true; runId: DutyRunId } | { ok: false; code: string; error: string } >
 
 /**
  * List one Duty's trigger audit history, newest first.
@@ -215,7 +215,7 @@ async recordTrigger(event: { readonly dutyId: DutyId readonly cause: DutyRunCaus
 
 Types: [SessionId](core.md)
 
-Source: [`packages/duty/duty/src/index.ts:193`](../../packages/duty/duty/src/index.ts)
+Source: [`packages/duty/duty/src/index.ts:195`](../../packages/duty/duty/src/index.ts)
 
 <a id="ctxdutyrunner--dutyrunnerservice"></a>
 
@@ -228,12 +228,14 @@ Runtime that turns observations into runs and drives each run's Session to a ter
  * Start one run by hand, bypassing the trigger seam.
  * @param dutyId - The Duty to run.
  * @param cause - Why a human or model asked for this run.
+ * @param options - `wait` resolves only after the run settles, so a
+ * foreground caller observes the outcome rather than just the admission.
  * @returns the started run.
  */
-async startRun(dutyId: DutyId, cause: DutyRunCause): Promise<DutyRun>
+async startRun(dutyId: DutyId, cause: DutyRunCause, options: { readonly wait?: boolean } = {}): Promise<DutyRun>
 ```
 
-Source: [`packages/duty/duty-runner/src/index.ts:152`](../../packages/duty/duty-runner/src/index.ts)
+Source: [`packages/duty/duty-runner/src/index.ts:157`](../../packages/duty/duty-runner/src/index.ts)
 
 <a id="ctxdutytriggers--dutytriggerservice"></a>
 
@@ -287,7 +289,7 @@ One durable human decision was answered and is now settled. The run runtime list
 'duty/human-answered'(request: HumanRequest): void
 ```
 
-Source: [`packages/duty/duty/src/index.ts:83`](../../packages/duty/duty/src/index.ts)
+Source: [`packages/duty/duty/src/index.ts:84`](../../packages/duty/duty/src/index.ts)
 
 <a id="dutytrigger--emit"></a>
 
