@@ -52,7 +52,8 @@
     "@deepseek-ai/dsh-session-persistence": "workspace:^",
     "@deepseek-ai/dsh-subagent": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
-    "@deepseek-ai/dsh-session-projection": "workspace:^"
+    "@deepseek-ai/dsh-session-projection": "workspace:^",
+    "@deepseek-ai/dsh-duty-verify": "workspace:^"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:^",
@@ -70,6 +71,7 @@
     "@deepseek-ai/dsh-session-persistence": "workspace:^",
     "@deepseek-ai/dsh-subagent": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
-    "@deepseek-ai/dsh-session-projection": "workspace:^"
+    "@deepseek-ai/dsh-session-projection": "workspace:^",
+    "@deepseek-ai/dsh-duty-verify": "workspace:^"
   }
 }

@@ -53,6 +53,27 @@ export function foldRunMachine(events: readonly SessionEvent[]): DutyRunMachineS
         if (waitingHuman?.requestId === event.data.requestId) waitingHuman = undefined
         break
       }
+      case 'duty/verdict': {
+        const { data } = event
+        const record: DutyStepRecord = {
+          stepId: data.stepId,
+          label: data.stepId,
+          status: 'started',
+          attempts: 1,
+          lastVerdict: {
+            pass: data.pass,
+            ...(data.reason === undefined ? {} : { reason: data.reason }),
+          },
+        }
+        const existing = steps.get(data.stepId)
+        if (existing === undefined) {
+          steps.set(data.stepId, record)
+          ordered.push(record)
+        } else {
+          Object.assign(existing, { lastVerdict: record.lastVerdict })
+        }
+        break
+      }
       case 'duty/run-finish': {
         // A waiting_for_human finish event is a park marker, not a terminal
         // outcome: the same Session resumes once the human answers.

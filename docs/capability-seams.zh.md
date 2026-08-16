@@ -9,9 +9,12 @@
 
 ```mermaid
 flowchart LR
+  pkg_duty_verify["duty-verify"]
+  svc_dutyVerifiers["ctx.dutyVerifiers<br/>Independent step-completion verification"]
+  pkg_duty_verify_evaluator["duty-verify-evaluator"]
+  pkg_duty_runner["duty-runner"]
   pkg_duty["duty"]
   svc_duties["ctx.duties<br/>Durable responsibility domain"]
-  pkg_duty_runner["duty-runner"]
   pkg_tool_duty["tool-duty"]
   pkg_command_duty["command-duty"]
   pkg_duty_trigger["duty-trigger"]
@@ -233,6 +236,8 @@ flowchart LR
   pkg_duty_runner --> svc_dutyRunner
   pkg_duty_trigger --> svc_dutyTriggers
   pkg_duty_trigger_timer --> svc_dutyTriggers
+  pkg_duty_verify --> svc_dutyVerifiers
+  pkg_duty_verify_evaluator --> svc_dutyVerifiers
   pkg_e2b --> svc_e2b
   pkg_fs --> svc_fs
   pkg_fs_e2b --> svc_fs
@@ -334,6 +339,7 @@ flowchart LR
   svc_dutyRunner --> pkg_command_duty
   svc_dutyRunner --> pkg_tool_duty
   svc_dutyTriggers --> pkg_duty_runner
+  svc_dutyVerifiers --> pkg_duty_runner
   svc_dynamicCordisRunner --> pkg_tool_cordis
   svc_e2b --> pkg_fs_e2b
   svc_e2b --> pkg_subprocess_e2b
@@ -429,9 +435,9 @@ flowchart LR
   svc_workspaceRegistry --> pkg_apiproxy
   svc_fs -. event gate .-> pkg_fs_observation_policy
 ```
-
 | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.dutyVerifiers` | `seam` | [`duty-verify`](../packages/duty/duty-verify) | [`duty-verify-evaluator`](../packages/duty/duty-verify-evaluator) | [`duty-runner`](../packages/duty/duty-runner) | - | 解析一个配置的 verifier id；run 运行时在 `duty_step_done` 之后为开启验证的 Duty 咨询它，失败判定把步骤送回修复。 |
 | `ctx.duties` | `core` | [`duty`](../packages/duty/duty) | - | [`duty-runner`](../packages/duty/duty-runner)、[`tool-duty`](../packages/duty/tool-duty)、[`command-duty`](../packages/duty/command-duty) | - | 在 duty 存储域中负责 Duty 合约、运行状态、run 记录、人工决策与单 run claim。 |
 | `ctx.dutyTriggers` | `seam` | [`duty-trigger`](../packages/duty/duty-trigger) | [`duty-trigger-timer`](../packages/duty/duty-trigger-timer) | [`duty-runner`](../packages/duty/duty-runner) | - | 按亚分钟节奏轮询已注册 provider，并把到期观测发布为 duty/trigger 事件。 |
 | `ctx.dutyRunner` | `core` | [`duty-runner`](../packages/duty/duty-runner) | - | [`tool-duty`](../packages/duty/tool-duty)、[`command-duty`](../packages/duty/command-duty) | - | claim run、以 agent 回合与子代理扇出驱动执行 body，并在持久化人工决策上停靠。 |

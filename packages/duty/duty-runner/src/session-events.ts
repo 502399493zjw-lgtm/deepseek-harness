@@ -60,5 +60,14 @@ declare module '@deepseek-ai/dsh-session/types' {
       readonly status: DutyRunStatus
       readonly summary?: string
     }
+    /**
+     * One independent verification verdict for a step that reported
+     * completion. A failed verdict precedes a repair attempt.
+     */
+    'duty/verdict': {
+      readonly stepId: string
+      readonly pass: boolean
+      readonly reason?: string
+    }
   }
 }

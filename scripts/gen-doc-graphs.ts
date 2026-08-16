@@ -97,6 +97,15 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'dutyVerifiers',
+    pkg: 'duty-verify',
+    title: 'Independent step-completion verification',
+    mode: 'seam',
+    implementations: ['duty-verify-evaluator'],
+    consumers: ['duty-runner'],
+    note: 'Resolves one configured verifier id; the run runtime consults it after duty_step_done for duties with verification on, and a failed verdict repairs the step.',
+  },
+  {
     key: 'duties',
     pkg: 'duty',
     title: 'Durable responsibility domain',

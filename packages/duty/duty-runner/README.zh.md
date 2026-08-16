@@ -31,7 +31,8 @@ run 的 Session 日志是机器状态的唯一权威。每次状态变化都是�
 2. **世界。** run 的 Agent 以作用域世界创建:`tools.restrict` 把工具收敛到 `toolPolicy.allow`,`tools.guard` 拒绝 gated 工具,并注册三个 run 作用域工具:`duty_adapt_body`(结构调整)、`duty_step_done`(完成标记)、`duty_request_human`(持久化人工问题)。
 3. **开场。** 第一条模型可见消息是点名触发原因的中文开场白,随后是第一步指令。步骤只有模型调用 `duty_step_done` 才算完成;从未汇报的步骤最多修复 `maxRepairs` 次,随后判 run 失败。
 4. **Body。** `agent` 步骤作为 run Agent 上的回合执行;`phase` 步骤按序递归;`parallel` 步骤经 subagent seam 扇出子步骤,只有全部子代理以 `completed` 停止才算完成。
-5. **停靠与恢复。** `duty_request_human` 创建持久化 {@link HumanRequest},追加 `duty/human-wait`,并以 `waiting_for_human` 结清 run、保持名额。答复落库后,`dsh-duty` 发出 `duty/human-answered`;runner 恢复同一 Session,追加 `duty/human-answer`,从折叠状态继续。停靠的 run 跨进程重启存活:启动对账重新武装它,并通过重放持久化日志冷恢复被打断的 run。
+5. **验证。** `verification: 'on'` 时,已汇报的步骤完成经过配置的 `ctx.dutyVerifiers` 检查器,基于该步骤的证据窗口判定;每次判定记录为 `duty/verdict`,失败判定把步骤送回修复,缺失检查器令 run 大声失败。
+6. **停靠与恢复。** `duty_request_human` 创建持久化 {@link HumanRequest},追加 `duty/human-wait`,并以 `waiting_for_human` 结清 run、保持名额。答复落库后,`dsh-duty` 发出 `duty/human-answered`;runner 恢复同一 Session,追加 `duty/human-answer`,从折叠状态继续。停靠的 run 跨进程重启存活:启动对账重新武装它,并通过重放持久化日志冷恢复被打断的 run。
 6. **结清。** cursor 只在成功时推进。run 成本是该 Session 的 `assistant/message` usage 之和乘以 `tokenPriceUsdPerMillion`;超过 `limits.budgetUsd` 判失败并以 `budget` 暂停,与失败计数无关。连续失败按 `limits.maxConsecutiveFailures` 以 `failures` 暂停。
 
 ## 模型体验
@@ -52,7 +53,7 @@ run Session 内只追加:每次尝试在可复用前缀之后延续对话。子�
 
 ## 已知限制与待办
 
-- **无独立验证** — 模型通过 `duty_step_done` 标记自己的步骤完成;没有评估者认证该声明。推迟到验证层。
+- **验证是可选开启的** — 默认 `verification: 'off'` 接受模型自报的 `duty_step_done`;`'on'` 咨询 `ctx.dutyVerifiers` seam,其 evaluator provider 判定证据窗口,失败判定把步骤送回修复。
 - **无跨进程单 run 保证** — claim 经单 Host 进程的域写链串行化;两个 Host 进程同时运行 runner 都会轮询,输掉 claim 竞争的一方得到一条跳过记录。
 - **结构调整由模型撰写** — `duty_adapt_body` 按持久化 schema 校验调整后的 body,但执行前不强制与存储 body 的 diff 审查。
 - **预算定价是单一综合费率** — 按 provider 或模型的定价待做;run 以配置的每百万 token 美元价归集成本。

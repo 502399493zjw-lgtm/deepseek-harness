@@ -73,10 +73,36 @@ describe('duty run projection', () => {
     expect(finished?.finished).toEqual({ status: 'succeeded', summary: 'done' })
   })
 
+  it('folds a verdict onto its step and clears it on the next attempt', () => {
+    let state: DutyRunMachineState | undefined
+    state = applyDutyRunProjection(state, event('duty/run-bound', {
+      dutyId: DutyId('d1'), runId: 'r1', cause: { kind: 'schedule', reason: 'hourly' },
+    }, 1))
+    state = applyDutyRunProjection(state, event('duty/step', {
+      stepId: 'a', label: 'Collect', status: 'started', attempts: 1,
+    }, 2))
+    state = applyDutyRunProjection(state, event('duty/verdict', {
+      stepId: 'a', pass: false, reason: 'no proof',
+    }, 3))
+    expect(state?.steps[0]?.lastVerdict).toEqual({ pass: false, reason: 'no proof' })
+
+    const passed = applyDutyRunProjection(state, event('duty/verdict', {
+      stepId: 'a', pass: true,
+    }, 4))
+    expect(passed?.steps[0]?.lastVerdict).toEqual({ pass: true })
+  })
+
+  it('creates a record for a verdict with no prior step event', () => {
+    const created = applyDutyRunProjection(undefined, event('duty/verdict', {
+      stepId: 'x', pass: true,
+    }, 1))
+    expect(created?.steps[0]).toMatchObject({ stepId: 'x', lastVerdict: { pass: true } })
+  })
+
   it('validates a complete machine state against the wire schema', () => {
     const state: DutyRunMachineState = {
       bound: { dutyId: DutyId('d1'), runId: 'r1', cause: { kind: 'schedule', reason: 'hourly' } },
-      steps: [{ stepId: 'a', label: 'Collect', status: 'completed', attempts: 1, summary: 'ok' }],
+      steps: [{ stepId: 'a', label: 'Collect', status: 'completed', attempts: 1, summary: 'ok', lastVerdict: { pass: true } }],
       waitingHuman: { requestId: 'h1', question: 'Send?' },
       finished: { status: 'failed', summary: 'budget exceeded' },
     }

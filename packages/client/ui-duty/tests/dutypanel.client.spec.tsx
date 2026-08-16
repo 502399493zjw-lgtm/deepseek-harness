@@ -38,6 +38,7 @@ function makeDuty(over: Partial<DutyView> = {}): DutyView {
       mode: 'standing',
       goal: 'Keep the queue triaged.',
       trigger: { kind: 'interval', description: 'every hour', everyMs: 3600000 },
+      verification: 'off',
       body: { steps: [] },
       toolPolicy: { allow: [], gated: [] },
       limits: { maxConsecutiveFailures: 3 },

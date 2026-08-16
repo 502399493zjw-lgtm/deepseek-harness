@@ -7,9 +7,12 @@ A service can be a core spine service, a swappable capability seam, or a bundle/
 
 ```mermaid
 flowchart LR
+  pkg_duty_verify["duty-verify"]
+  svc_dutyVerifiers["ctx.dutyVerifiers<br/>Independent step-completion verification"]
+  pkg_duty_verify_evaluator["duty-verify-evaluator"]
+  pkg_duty_runner["duty-runner"]
   pkg_duty["duty"]
   svc_duties["ctx.duties<br/>Durable responsibility domain"]
-  pkg_duty_runner["duty-runner"]
   pkg_tool_duty["tool-duty"]
   pkg_command_duty["command-duty"]
   pkg_duty_trigger["duty-trigger"]
@@ -231,6 +234,8 @@ flowchart LR
   pkg_duty_runner --> svc_dutyRunner
   pkg_duty_trigger --> svc_dutyTriggers
   pkg_duty_trigger_timer --> svc_dutyTriggers
+  pkg_duty_verify --> svc_dutyVerifiers
+  pkg_duty_verify_evaluator --> svc_dutyVerifiers
   pkg_e2b --> svc_e2b
   pkg_fs --> svc_fs
   pkg_fs_e2b --> svc_fs
@@ -332,6 +337,7 @@ flowchart LR
   svc_dutyRunner --> pkg_command_duty
   svc_dutyRunner --> pkg_tool_duty
   svc_dutyTriggers --> pkg_duty_runner
+  svc_dutyVerifiers --> pkg_duty_runner
   svc_dynamicCordisRunner --> pkg_tool_cordis
   svc_e2b --> pkg_fs_e2b
   svc_e2b --> pkg_subprocess_e2b
@@ -430,6 +436,7 @@ flowchart LR
 
 | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.dutyVerifiers` | `seam` | [`duty-verify`](../packages/duty/duty-verify) | [`duty-verify-evaluator`](../packages/duty/duty-verify-evaluator) | [`duty-runner`](../packages/duty/duty-runner) | - | Resolves one configured verifier id; the run runtime consults it after duty_step_done for duties with verification on, and a failed verdict repairs the step. |
 | `ctx.duties` | `core` | [`duty`](../packages/duty/duty) | - | [`duty-runner`](../packages/duty/duty-runner), [`tool-duty`](../packages/duty/tool-duty), [`command-duty`](../packages/duty/command-duty) | - | Owns duty contracts, operational state, run records, human decisions, and the single-run claim in the duty storage domain. |
 | `ctx.dutyTriggers` | `seam` | [`duty-trigger`](../packages/duty/duty-trigger) | [`duty-trigger-timer`](../packages/duty/duty-trigger-timer) | [`duty-runner`](../packages/duty/duty-runner) | - | Sweeps registered providers on a sub-minute cadence and publishes due observations as duty/trigger events. |
 | `ctx.dutyRunner` | `core` | [`duty-runner`](../packages/duty/duty-runner) | - | [`tool-duty`](../packages/duty/tool-duty), [`command-duty`](../packages/duty/command-duty) | - | Claims runs, drives execution bodies as agent turns and subagent fan-out, and parks on durable human decisions. |

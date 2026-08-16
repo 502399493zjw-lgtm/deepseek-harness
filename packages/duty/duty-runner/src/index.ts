@@ -37,6 +37,7 @@ import type {
   HumanRequest,
 } from '@deepseek-ai/dsh-duty'
 import type { DutyTriggerObservation } from '@deepseek-ai/dsh-duty-trigger'
+import type { DutyVerificationEvidence, DutyVerificationRequest } from '@deepseek-ai/dsh-duty-verify'
 import './session-events.ts'
 import { flattenStepIds, foldRunMachine, nextIncompleteStepId } from './machine.ts'
 import {
@@ -75,10 +76,41 @@ function renderThrown(value: unknown): string {
   return value instanceof Error ? value.message : String(value)
 }
 
+/** Render one step's evidence window into bounded lines for a verifier. */
+function renderEvidence(session: Session, stepId: string): DutyVerificationEvidence[] {
+  const events = session.events
+  const startedAt = events.reduce<number>((at, event, index) => {
+    if (event.type !== 'duty/step') return at
+    const data = event.data as { stepId: string; status: string }
+    return data.stepId === stepId && data.status === 'started' ? index : at
+  }, -1)
+  const lines: DutyVerificationEvidence[] = []
+  for (const event of events.slice(startedAt + 1)) {
+    if (event.type === 'tool/result') {
+      const text = JSON.stringify(event.data).slice(0, MAX_EVIDENCE_LINE_CHARS)
+      lines.push({ kind: 'tool-result', text })
+      continue
+    }
+    if (event.type === 'assistant/message') {
+      const text = JSON.stringify(event.data).slice(0, MAX_EVIDENCE_LINE_CHARS)
+      lines.push({ kind: 'assistant', text })
+    }
+  }
+  return lines
+}
+
 /** The optional host default-model service, read at admission time. */
 interface DefaultModelLike {
   currentSelection(): { provider: string; model: string }
 }
+
+/** The optional verification registry, resolved per step. */
+interface DutyVerifierRegistryLike {
+  verify(request: DutyVerificationRequest): Promise<{ pass: boolean; reason?: string }>
+}
+
+/** One rendered evidence line's size budget, so a step window stays bounded. */
+const MAX_EVIDENCE_LINE_CHARS = 400
 
 /**
  * The Chinese kickoff naming the trigger cause, kept verbatim from the loop
@@ -529,6 +561,45 @@ export class DutyRunnerService extends Service {
     }
   }
 
+  /**
+   * Judge one reported step completion. Duties with `verification: 'on'`
+   * consult the configured verifier over the step's evidence window; a missing
+   * verifier fails loud, and every verdict is recorded as `duty/verdict`.
+   * @param agent - the live run Agent (the verifier's subagent parent).
+   * @param local - the run's working set.
+   * @param step - the step that reported completion.
+   * @param summary - the model's one-line completion statement.
+   * @returns the verdict; a thrown infrastructure failure rejects and fails
+   * the run rather than passing silently.
+   */
+  private async verifyStep(
+    agent: Agent,
+    local: RunLocal,
+    step: DutyStep,
+    summary: string,
+  ): Promise<{ pass: boolean; reason?: string }> {
+    if (local.spec.verification !== 'on') return { pass: true }
+    const registry = this.ctx.get('dutyVerifiers') as unknown as DutyVerifierRegistryLike | undefined
+    if (registry === undefined) {
+      throw new Error('verification is enabled but no duty verifier registry is loaded')
+    }
+    const verdict = await registry.verify({
+      dutyId: local.run.dutyId,
+      runId: local.run.id,
+      sessionId: local.run.sessionId,
+      step,
+      summary,
+      evidence: renderEvidence(agent.session, step.id),
+      parent: agent,
+    })
+    agent.session.append('duty/verdict', {
+      stepId: step.id,
+      pass: verdict.pass,
+      ...(verdict.reason === undefined ? {} : { reason: verdict.reason }),
+    })
+    return verdict
+  }
+
   /** Execute one step: agent turns with repair, phase recursion, or fan-out. */
   private async executeStep(agent: Agent, local: RunLocal, step: DutyStep): Promise<void> {
     agent.session.append('duty/step', {
@@ -578,14 +649,19 @@ export class DutyRunnerService extends Service {
       if (local.parkedRequestId !== undefined) return
       const summary = local.summaries.get(step.id)
       if (summary !== undefined) {
-        agent.session.append('duty/step', {
-          stepId: step.id,
-          label: step.label,
-          status: 'completed',
-          attempts: attempt,
-          summary,
-        })
-        return
+        const verdict = await this.verifyStep(agent, local, step, summary)
+        if (verdict.pass) {
+          agent.session.append('duty/step', {
+            stepId: step.id,
+            label: step.label,
+            status: 'completed',
+            attempts: attempt,
+            summary,
+          })
+          return
+        }
+        // A failed verdict falls through to the next repair attempt; the
+        // verdict itself is already recorded in the session log.
       }
     }
     agent.session.append('duty/step', {

@@ -17,6 +17,7 @@ Status: implemented
 - **`dsh-duty-trigger-timer`** 为 `interval` 与 `cron` 类型的 Duty 注册 `timer` provider。interval 的发生点锚定在创建时间上;cron 是五段数值子集、Vixie OR 日期语义,因仓库没有现成解析库、且所需操作是"此刻之后的最近一次匹配"而手写实现。错过的发生点只前进不重放:一个 Duty 只为最近一次已过去的发生点醒来一次。注册表 `pollIntervalMs` 上限(≤ 60 秒)保证整分钟 cron 匹配不会落在两次 sweep 之间。
 - **`dsh-duty-runner`** 是运行时:收到观测或手动启动后先 claim,再用 `tools.restrict` 把工具收敛到 `toolPolicy.allow`、用 `tools.guard` 拒绝 gated 工具,创建 run 的 Session 与 Agent,然后执行 body。Session 日志是机器状态的唯一权威:`duty/run-bound`、`duty/step`、`duty/human-wait`、`duty/human-answer`、`duty/run-finish` 事件折叠出机器状态,因此停靠的 run 在重启后靠重放持久化日志恢复。agent 步骤只有模型调用 run 作用域内的 `duty_step_done` 才算完成;从未汇报的步骤最多修复 `maxRepairs` 次后判 run 失败。`parallel` 步骤经 `ctx.subagents` 扇出。开场白沿用中文"开始执行你的 loop flow。本次触发原因:${reason}。"。run 成本是该 Session 中 `assistant/message` usage 之和乘以配置的 `tokenPriceUsdPerMillion`;超过 `limits.budgetUsd` 即判失败并以 `budget` 暂停。
 - **`dsh-tool-duty`** 向模型暴露 `duty_list`、`duty_create`、`duty_set_lifecycle`、`duty_start`、`duty_answer`;**`dsh-command-duty`** 注册 `/duty` 与 `/loop`,`/loop` 把当前转录提炼为 Duty 合约草稿的指令交给模型。
+- **`dsh-duty-verify`** 是独立完成验证 seam(`ctx.dutyVerifiers`,一个配置的 verifier id),**`dsh-duty-verify-evaluator`** 注册 verifier `evaluator`:每次已汇报的步骤完成启动一个一次性子代理,基于运行时渲染的证据窗口返回结构化 `{ pass, reason }` 判定。Duty 以 `verification: 'on'` 选择启用;runner 把每次判定记录为 `duty/verdict`,失败判定进入修复,配置的检查器缺失时令 run 大声失败。评估者的中文指令由 duty 快照固定。
 
 硬度分层按方案执行:能力层是唯一的硬层(工具收敛与 gating 由 Agent 作用域世界强制执行,而不是靠提示词),行动指引保持软性,Phase 1 不设学习记忆层。执行 body 是结构化数据,在合约边界校验(`MAX_BODY_STEPS` 30、深度 5、`MAX_PARALLEL_WIDTH` 8、预算 ≤ 20 美元、gated ⊆ allow、agent 步骤必须有 prompt);不存在会与实际执行计划漂移的渲染版 `flow.js`,`duty_adapt_body` 把结构调整以结构化方式记录进 run 日志。
 
@@ -32,5 +33,6 @@ Status: implemented
 
 - runner 在人工答复上停靠,并从持久化日志冷恢复被打断的 run;启动对账重新武装停靠中的 run、把无法恢复的判为失败。
 - 触发注册表与 timer provider 是进程内投影;第二个 Host 进程会重复 sweep,单 run claim 会把重复转化为一条 skip 记录。
-- 留待后续迭代:独立验证层、按 provider 的定价、cron 时区、`DutyService` 上的 Typert Host Remote 合约、Client Remote 聚合与 `ui-duty`(仓库的 message-feedback 包已确立"先交付 Host 侧、推迟 client 聚合"的先例),以及测试策略要求的、经真实可运行示例固定中文开场白的 keyless 快照。
+- 首个提交之后落地:Typert Host Remote 合约、`duty` session projection、`ui-duty`、可运行示例与 keyless 快照,以及带 evaluator provider 的验证 seam。
+- 留待后续迭代:按 provider 的定价、cron 时区、按 Duty 选择检查器、失败判定的人工申诉面。
 - `duty/step` 等会话事件在 `SessionEventMap` 上不带 `ignorable` 声明,因此含这些事件的会话需要 duty-runner 包(或其类型)才能被读取;duty profile 总是加载它。

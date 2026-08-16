@@ -28,6 +28,10 @@ export const dutyRunProjectionSchema = z.object({
     status: z.union([z.literal('started'), z.literal('completed'), z.literal('failed')]),
     attempts: z.number().int().positive(),
     summary: z.string().optional(),
+    lastVerdict: z.object({
+      pass: z.boolean(),
+      reason: z.string().optional(),
+    }).optional(),
   })),
   waitingHuman: z.object({
     requestId: z.string().min(1),
@@ -99,6 +103,31 @@ export function applyDutyRunProjection(
       if (state?.waitingHuman?.requestId !== event.data.requestId) return state
       const { waitingHuman: _cleared, ...rest } = state
       return { ...rest }
+    }
+    case 'duty/verdict': {
+      const base = state ?? { steps: [] }
+      const { data } = event
+      const index = base.steps.findIndex(step => step.stepId === data.stepId)
+      const verdict = {
+        pass: data.pass,
+        ...(data.reason === undefined ? {} : { reason: data.reason }),
+      }
+      if (index === -1) {
+        return {
+          ...base,
+          steps: [...base.steps, {
+            stepId: data.stepId,
+            label: data.stepId,
+            status: 'started',
+            attempts: 1,
+            lastVerdict: verdict,
+          }],
+        }
+      }
+      const steps = base.steps.map((step, at) => at === index
+        ? { ...step, lastVerdict: verdict }
+        : step)
+      return { ...base, steps }
     }
     case 'duty/run-finish': {
       // A waiting_for_human finish event is a park marker, not a terminal

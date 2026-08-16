@@ -49,6 +49,9 @@
     },
     {
       "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../duty/duty-verify"
     }
   ]
 }

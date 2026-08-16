@@ -89,3 +89,11 @@
   opacity: 0.5;
   cursor: default;
 }
+
+.verdictPass {
+  color: var(--dsw-color-text-success);
+}
+
+.verdictFail {
+  color: var(--dsw-color-text-danger);
+}

@@ -74,6 +74,12 @@ export function DutyRunDock({ useProjection, answer, t }: DutyRunDockProps) {
                 ? ` (${step.attempts}${t('run.attempts')})`
                 : ''}
               {step.status === 'completed' && step.summary !== undefined ? ` — ${step.summary}` : ''}
+              {step.lastVerdict !== undefined && (
+                <span className={step.lastVerdict.pass ? css.verdictPass : css.verdictFail}>
+                  {step.lastVerdict.pass ? t('run.verdict.pass') : t('run.verdict.fail')}
+                  {step.lastVerdict.reason === undefined ? '' : ` — ${step.lastVerdict.reason}`}
+                </span>
+              )}
             </li>
           ))}
         </ol>

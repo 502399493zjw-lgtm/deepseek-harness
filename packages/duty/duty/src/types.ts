@@ -63,6 +63,13 @@ export type DutyMode = 'once' | 'standing'
 /** Whether a Duty may currently be woken. */
 export type DutyLifecycle = 'draft' | 'active' | 'paused' | 'archived'
 
+/**
+ * Whether step completion requires an independent verdict. With `on`, the run
+ * runtime consults a registered verifier before accepting `duty_step_done`;
+ * a failed verdict sends the step back through repair. Defaults to `off`.
+ */
+export type DutyVerification = 'off' | 'on'
+
 /** Why a Duty stopped waking itself. */
 export type DutyPauseReason = 'failures' | 'budget' | 'escalation' | 'human'
 
@@ -166,6 +173,8 @@ export interface DutySpec {
   readonly scope?: string
   /** The waking rule. */
   readonly trigger: DutyTrigger
+  /** Whether step completion requires an independent verdict. */
+  readonly verification: DutyVerification
   /** The declared execution body. */
   readonly body: DutyBody
   /** Tool allowance and gating. */
@@ -337,6 +346,7 @@ export interface CreateDutyRequest {
   readonly goal: string
   readonly scope?: string
   readonly trigger: DutyTrigger
+  readonly verification?: DutyVerification
   readonly body: DutyBody
   readonly toolPolicy: DutyToolPolicy
   readonly limits?: Partial<DutyLimits>
@@ -351,6 +361,7 @@ export interface EditDutyRequest {
   readonly goal?: string
   readonly scope?: string
   readonly trigger?: DutyTrigger
+  readonly verification?: DutyVerification
   readonly body?: DutyBody
   readonly toolPolicy?: DutyToolPolicy
   readonly limits?: Partial<DutyLimits>

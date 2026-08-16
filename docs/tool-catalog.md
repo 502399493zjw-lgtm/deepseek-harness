@@ -1001,6 +1001,10 @@ Create one Duty in draft from a complete contract: title, goal, trigger, executi
     "trigger": {
       "description": "kind manual | interval (everyMs >= 60000) | cron (five numeric fields), plus a description."
     },
+    "verification": {
+      "type": "string",
+      "description": "off (default) | on — whether step completion requires an independent verifier verdict."
+    },
     "body": {
       "description": "Execution body: steps of kind agent (prompt required), parallel, or phase with children."
     },

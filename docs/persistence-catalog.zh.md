@@ -481,6 +481,24 @@ Source: [`packages/duty/duty-runner/src/session-events.ts:59`](../packages/duty/
 
 Source: [`packages/duty/duty-runner/src/session-events.ts:33`](../packages/duty/duty-runner/src/session-events.ts)
 
+<a id="dutyverdict--log-only"></a>
+
+#### `duty/verdict` — log-only
+
+```ts persistence-catalog
+/**
+ * One independent verification verdict for a step that reported
+ * completion. A failed verdict precedes a repair attempt.
+ */
+'duty/verdict': {
+  readonly stepId: string
+  readonly pass: boolean
+  readonly reason?: string
+}
+```
+
+Source: [`packages/duty/duty-runner/src/session-events.ts:67`](../packages/duty/duty-runner/src/session-events.ts)
+
 ### `feedback/*`
 
 <a id="feedbackrecord--log-only"></a>

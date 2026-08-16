@@ -27,6 +27,11 @@ export interface DutyStepRecord {
   readonly attempts: number
   /** The model's one-line completion statement; absent while incomplete. */
   readonly summary?: string
+  /** The latest independent verdict for this step; absent without one. */
+  readonly lastVerdict?: {
+    readonly pass: boolean
+    readonly reason?: string
+  }
 }
 
 /** A durable request the run parked on, still awaiting an answer. */

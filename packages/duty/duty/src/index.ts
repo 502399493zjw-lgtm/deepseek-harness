@@ -288,6 +288,7 @@ export class DutyService extends TypertRemoteService {
       goal: request.goal,
       ...(request.scope === undefined ? {} : { scope: request.scope }),
       trigger: request.trigger,
+      verification: request.verification ?? 'off',
       body: request.body,
       toolPolicy: request.toolPolicy,
       limits: {
@@ -329,12 +330,14 @@ export class DutyService extends TypertRemoteService {
         throw new DutyError('version-conflict', `duty '${id}' moved past version '${expected}'`)
       }
       const trigger = request.trigger ?? current.trigger
+      const verification = request.verification ?? current.verification
       return validateSpec({
         ...current,
         ...(request.title === undefined ? {} : { title: request.title }),
         ...(request.goal === undefined ? {} : { goal: request.goal }),
         ...(request.scope === undefined ? {} : { scope: request.scope }),
         trigger,
+        verification,
         mode: trigger.kind === 'manual' ? 'once' : 'standing',
         ...(request.body === undefined ? {} : { body: request.body }),
         ...(request.toolPolicy === undefined ? {} : { toolPolicy: request.toolPolicy }),

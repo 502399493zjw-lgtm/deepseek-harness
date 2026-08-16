@@ -44,6 +44,22 @@ describe('run machine fold', () => {
     expect(answered.waitingHuman).toBeUndefined()
   })
 
+  it('attaches the latest verdict to its step, latest wins', () => {
+    const state = foldRunMachine([
+      event('duty/step', { stepId: 'a', label: 'Collect', status: 'started', attempts: 1 }, 1),
+      event('duty/verdict', { stepId: 'a', pass: false, reason: 'no proof' }, 2),
+      event('duty/verdict', { stepId: 'a', pass: true }, 3),
+    ])
+    expect(state.steps[0]?.lastVerdict).toEqual({ pass: true })
+  })
+
+  it('creates a step record for a verdict without a prior step event', () => {
+    const state = foldRunMachine([
+      event('duty/verdict', { stepId: 'b', pass: false, reason: 'no proof' }, 1),
+    ])
+    expect(state.steps[0]).toMatchObject({ stepId: 'b', lastVerdict: { pass: false, reason: 'no proof' } })
+  })
+
   it('records the terminal outcome', () => {
     const state = foldRunMachine([
       event('duty/run-finish', { status: 'succeeded', summary: 'done' }, 1),

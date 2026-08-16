@@ -17,6 +17,7 @@ function view(spec: Partial<DutySpec>, state: Partial<DutyState>): DutyView {
       mode: 'standing',
       goal: 'Keep the queue triaged.',
       trigger: { kind: 'interval', description: 'every hour', everyMs: 3_600_000 },
+      verification: 'off',
       body: { steps: [{ id: 's', kind: 'agent', label: 'Work', prompt: 'work' }] },
       toolPolicy: { allow: [], gated: [] },
       limits: { maxConsecutiveFailures: 3 },

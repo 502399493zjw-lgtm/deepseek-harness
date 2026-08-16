@@ -686,6 +686,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'dutyVerifiers',
+    summary: 'Registry of independent completion checkers.',
+    description: 'Registry of independent completion checkers. The runtime resolves the configured verifier through resolve; a missing verifier is a loud misconfiguration, never a silent pass.',
+    methods: [
+      {
+        signature: 'register(verifier: DutyVerifier): () => void',
+        description: 'Register one completion checker.',
+        parameters: [{ name: 'verifier', description: 'The checker to register under its id.' }],
+        returns: 'the disposer that unregisters it.',
+      },
+      {
+        signature: 'verifierIds(): readonly string[]',
+        description: 'Registered verifier ids, in registration order.',
+        parameters: [],
+        returns: 'the current verifier id list.',
+      },
+      {
+        signature: 'resolve(): DutyVerifier | undefined',
+        description: 'Resolve the configured verifier.',
+        parameters: [],
+        returns: 'the selected checker, or `undefined` when nothing is registered under the configured id.',
+      },
+      {
+        signature: 'async verify(request: DutyVerificationRequest): Promise<DutyVerdict>',
+        description: 'Judge one reported completion through the configured verifier.',
+        parameters: [{ name: 'request', description: 'the step, its summary, and the bounded evidence.' }],
+        returns: 'the verdict; throws when the configured verifier is missing.',
+      },
+    ],
+  },
+  {
     key: 'e2b',
     summary: 'Creates one lazily consumable E2B SDK handle and deletes the sandbox at timeout or disposal.',
     description: 'Creates one lazily consumable E2B SDK handle and deletes the sandbox at timeout or disposal. Creation begins at plugin construction; adapters await getSandbox before their first operation.',
@@ -3066,7 +3097,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CreateDutyRequest',
-    declaration: 'export interface CreateDutyRequest {\n    readonly id?: string;\n    readonly title: string;\n    readonly goal: string;\n    readonly scope?: string;\n    readonly trigger: DutyTrigger;\n    readonly body: DutyBody;\n    readonly toolPolicy: DutyToolPolicy;\n    readonly limits?: Partial<DutyLimits>;\n    readonly escalation?: readonly string[];\n    readonly reporting?: string;\n    readonly projectId?: string;\n}',
+    declaration: 'export interface CreateDutyRequest {\n    readonly id?: string;\n    readonly title: string;\n    readonly goal: string;\n    readonly scope?: string;\n    readonly trigger: DutyTrigger;\n    readonly verification?: DutyVerification;\n    readonly body: DutyBody;\n    readonly toolPolicy: DutyToolPolicy;\n    readonly limits?: Partial<DutyLimits>;\n    readonly escalation?: readonly string[];\n    readonly reporting?: string;\n    readonly projectId?: string;\n}',
   },
   {
     name: 'CreateGoalRequest',
@@ -3230,7 +3261,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DutySpec',
-    declaration: 'export interface DutySpec {\n    readonly id: DutyId;\n    readonly title: string;\n    readonly mode: DutyMode;\n    readonly goal: string;\n    readonly scope?: string;\n    readonly trigger: DutyTrigger;\n    readonly body: DutyBody;\n    readonly toolPolicy: DutyToolPolicy;\n    readonly limits: DutyLimits;\n    readonly escalation: readonly string[];\n    readonly reporting?: string;\n    readonly projectId?: string;\n    readonly version: DutyVersion;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n}',
+    declaration: 'export interface DutySpec {\n    readonly id: DutyId;\n    readonly title: string;\n    readonly mode: DutyMode;\n    readonly goal: string;\n    readonly scope?: string;\n    readonly trigger: DutyTrigger;\n    readonly verification: DutyVerification;\n    readonly body: DutyBody;\n    readonly toolPolicy: DutyToolPolicy;\n    readonly limits: DutyLimits;\n    readonly escalation: readonly string[];\n    readonly reporting?: string;\n    readonly projectId?: string;\n    readonly version: DutyVersion;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n}',
   },
   {
     name: 'DutyState',
@@ -3265,6 +3296,26 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface DutyTriggerProvider {\n    readonly id: string;\n    poll(now: number): Promise<readonly DutyTriggerObservation[]>;\n}',
   },
   {
+    name: 'DutyVerdict',
+    declaration: 'export interface DutyVerdict {\n    readonly pass: boolean;\n    readonly reason?: string;\n}',
+  },
+  {
+    name: 'DutyVerification',
+    declaration: 'export type DutyVerification = \'off\' | \'on\';',
+  },
+  {
+    name: 'DutyVerificationEvidence',
+    declaration: 'export interface DutyVerificationEvidence {\n    readonly kind: string;\n    readonly text: string;\n}',
+  },
+  {
+    name: 'DutyVerificationRequest',
+    declaration: 'export interface DutyVerificationRequest {\n    readonly dutyId: DutyId;\n    readonly runId: DutyRunId;\n    readonly sessionId: SessionId;\n    readonly step: DutyStep;\n    readonly summary: string;\n    readonly evidence: readonly DutyVerificationEvidence[];\n    readonly parent: Agent;\n}',
+  },
+  {
+    name: 'DutyVerifier',
+    declaration: 'export interface DutyVerifier {\n    readonly id: string;\n    verify(request: DutyVerificationRequest): Promise<DutyVerdict>;\n}',
+  },
+  {
     name: 'DutyVersion',
     declaration: 'export type DutyVersion = Branded<\'DutyVersion\'>;',
   },
@@ -3290,7 +3341,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'EditDutyRequest',
-    declaration: 'export interface EditDutyRequest {\n    readonly title?: string;\n    readonly goal?: string;\n    readonly scope?: string;\n    readonly trigger?: DutyTrigger;\n    readonly body?: DutyBody;\n    readonly toolPolicy?: DutyToolPolicy;\n    readonly limits?: Partial<DutyLimits>;\n    readonly escalation?: readonly string[];\n    readonly reporting?: string;\n    readonly projectId?: string;\n}',
+    declaration: 'export interface EditDutyRequest {\n    readonly title?: string;\n    readonly goal?: string;\n    readonly scope?: string;\n    readonly trigger?: DutyTrigger;\n    readonly verification?: DutyVerification;\n    readonly body?: DutyBody;\n    readonly toolPolicy?: DutyToolPolicy;\n    readonly limits?: Partial<DutyLimits>;\n    readonly escalation?: readonly string[];\n    readonly reporting?: string;\n    readonly projectId?: string;\n}',
   },
   {
     name: 'EditGoalRequest',

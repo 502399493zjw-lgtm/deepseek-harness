@@ -157,6 +157,8 @@
     { "path": "./packages/duty/duty-trigger" },
     { "path": "./packages/duty/duty-trigger-timer" },
     { "path": "./packages/duty/duty-runner" },
+    { "path": "./packages/duty/duty-verify" },
+    { "path": "./packages/duty/duty-verify-evaluator" },
     { "path": "./packages/duty/tool-duty" },
     { "path": "./packages/duty/command-duty" },
     { "path": "./packages/workspace/workspace" },

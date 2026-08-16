@@ -31,7 +31,8 @@ The service injects `duties`, `agents`, `sessions`, `subagents`, and `sessionPer
 2. **World.** The run's Agent is created with its scoped world narrowed to `toolPolicy.allow` via `tools.restrict`, its gated tools denied by a `tools.guard`, and three run-scoped tools registered: `duty_adapt_body` (structural adaptation), `duty_step_done` (completion marking), and `duty_request_human` (durable human questions).
 3. **Kickoff.** The first model-visible message is the Chinese kickoff naming the trigger cause, followed by the first step instruction. A step completes only when the model calls `duty_step_done`; a step that never reports is repaired up to `maxRepairs` and then fails the run.
 4. **Body.** `agent` steps run as turns on the run's Agent; `phase` steps recurse in order; `parallel` steps fan their children out through the subagent seam and complete only when every child stops with `completed`.
-5. **Park and resume.** `duty_request_human` creates a durable {@link HumanRequest}, appends `duty/human-wait`, and settles the run as `waiting_for_human` with the claim held. When the answer commits, `dsh-duty` emits `duty/human-answered`; the runner resumes the same Session, appends `duty/human-answer`, and continues from the fold. A parked run survives a process restart: boot reconciliation re-arms it and cold-resumes interrupted runs by refolding their persisted logs.
+5. **Verify.** With `verification: 'on'`, a reported step completion goes through the configured `ctx.dutyVerifiers` checker over the step's evidence window; each verdict is recorded as `duty/verdict`, a failed verdict sends the step back through repair, and a missing verifier fails the run loudly.
+6. **Park and resume.** `duty_request_human` creates a durable {@link HumanRequest}, appends `duty/human-wait`, and settles the run as `waiting_for_human` with the claim held. When the answer commits, `dsh-duty` emits `duty/human-answered`; the runner resumes the same Session, appends `duty/human-answer`, and continues from the fold. A parked run survives a process restart: boot reconciliation re-arms it and cold-resumes interrupted runs by refolding their persisted logs.
 6. **Settle.** The cursor advances only on success. Run cost is the sum of the Session's `assistant/message` usage priced by `tokenPriceUsdPerMillion`; exceeding `limits.budgetUsd` fails the run and pauses the Duty on `budget` regardless of the failure count. Consecutive failures pause on `failures` per `limits.maxConsecutiveFailures`.
 
 ## Model Experience
@@ -52,7 +53,7 @@ Append-only within the run's Session: each attempt extends the conversation afte
 
 ## Known Limitations and Deferred Work
 
-- **No independent verification** — the model marks its own step completion through `duty_step_done`; no evaluator certifies the claim. Deferred to a verification layer.
+- **Verification is opt-in** — a Duty with `verification: 'off'` (the default) accepts the model's own `duty_step_done` report; `'on'` consults the `ctx.dutyVerifiers` seam, whose evaluator provider judges the evidence window, and a failed verdict repairs the step.
 - **No cross-process single-run guarantee** — the claim serializes through one Host process's domain write chain; two Host processes running the runner both poll and one loses the claim race by a skip record.
 - **Adaptation is model-authored** — `duty_adapt_body` validates the adapted body against the durable schema, but no diff review against the stored body is enforced before execution.
 - **Budget pricing is a single blended rate** — per-provider or per-model pricing is deferred; runs attribute cost under one configured USD-per-million-token price.

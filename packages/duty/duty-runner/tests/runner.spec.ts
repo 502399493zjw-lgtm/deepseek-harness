@@ -77,11 +77,13 @@ class FakeTools {
 type FollowupScript = (text: string, agent: FakeAgent) => Promise<void> | void
 
 /** Harness for the run runtime over a real duty domain and fake agents. */
-async function createRunnerHarness(): Promise<{
+async function createRunnerHarness(options: { withVerifiers?: boolean } = {}): Promise<{
   ctx: Context
   duty: DutyHarness
   tools: FakeTools
   scripts: Set<FollowupScript>
+  sessions: Map<SessionId, FakeSession>
+  setVerifier(fn: (request: unknown) => Promise<{ pass: boolean; reason?: string }>): void
   waitFor: (predicate: () => boolean) => Promise<void>
   dispose(): Promise<void>
 }> {
@@ -92,6 +94,12 @@ async function createRunnerHarness(): Promise<{
 
   duty.ctx.provide('sessions', { flush: async () => true })
   duty.ctx.provide('sessionPersistence', {})
+  let verifyStep = async (_request: unknown) => ({ pass: true })
+  if (options.withVerifiers !== false) {
+    duty.ctx.provide('dutyVerifiers', {
+      verify: async (request: unknown) => verifyStep(request),
+    })
+  }
   duty.ctx.provide('agents', {
     create: async (options: { sessionId: SessionId; setup?: (agentCtx: Context) => void }) => {
       const session = new FakeSession(options.sessionId)
@@ -141,6 +149,10 @@ async function createRunnerHarness(): Promise<{
     duty,
     tools,
     scripts,
+    sessions,
+    setVerifier: (fn: (request: unknown) => Promise<{ pass: boolean; reason?: string }>) => {
+      verifyStep = fn
+    },
     waitFor,
     dispose: async () => {
       await duty.dispose()
@@ -315,6 +327,72 @@ describe('duty run runtime', () => {
     expect(view?.state.lastOutcome).toBe('failed')
     const [run] = harness.duty.duties.runsOf(DutyId(dutyId))
     expect(run?.costUsd).toBeCloseTo(0.00001)
+  })
+
+  describe('independent verification', () => {
+    const verifySequence = (verdicts: Array<{ pass: boolean; reason?: string }>) => {
+      let index = 0
+      harness.setVerifier(async () => {
+        const verdict = verdicts[Math.min(index, verdicts.length - 1)]
+        index += 1
+        return verdict ?? { pass: true }
+      })
+    }
+
+    it('records a passing verdict and completes the step', async () => {
+      const { dutyId, stepId } = await activeDuty({ verification: 'on' })
+      verifySequence([{ pass: true }])
+      harness.scripts.add(completeStepScript(stepId, 'triaged 3 tickets'))
+
+      trigger(dutyId)
+
+      await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'succeeded')
+      const sessionsWithVerdict = [...harness.sessions.values()].filter(session =>
+        session.events.some((event: SessionEvent) => event.type === 'duty/verdict'))
+      expect(sessionsWithVerdict.length).toBe(1)
+      const [verdict] = sessionsWithVerdict[0]?.events.filter((event: SessionEvent) => event.type === 'duty/verdict') ?? []
+      expect((verdict?.data as { pass: boolean }).pass).toBe(true)
+    })
+
+    it('sends a failed verdict back through repair, then passes', async () => {
+      const { dutyId, stepId } = await activeDuty({ verification: 'on' })
+      verifySequence([{ pass: false, reason: 'no proof' }, { pass: true }])
+      harness.scripts.add(completeStepScript(stepId))
+
+      trigger(dutyId)
+
+      await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'succeeded')
+      const view = harness.duty.duties.get(DutyId(dutyId))
+      const completed = [...harness.sessions.values()].flatMap(session =>
+        session.events.filter((event: SessionEvent) => event.type === 'duty/step' && (event.data as { status: string }).status === 'completed'))
+      expect(completed[0]?.data).toMatchObject({ attempts: 2 })
+      expect(view?.state.cursor).toEqual({ lastStepId: stepId })
+    })
+
+    it('fails the run when every verdict fails', async () => {
+      const { dutyId } = await activeDuty({ verification: 'on' })
+      verifySequence([{ pass: false, reason: 'no proof' }])
+      harness.scripts.add(completeStepScript('collect'))
+
+      trigger(dutyId)
+
+      await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'failed')
+      const view = harness.duty.duties.get(DutyId(dutyId))
+      expect(view?.state.consecutiveFailures).toBe(1)
+    })
+
+    it('fails loud when verification is on but no registry is loaded', async () => {
+      await harness.dispose()
+      harness = await createRunnerHarness({ withVerifiers: false })
+      const { dutyId } = await activeDuty({ verification: 'on' })
+      harness.scripts.add(completeStepScript('collect'))
+
+      trigger(dutyId)
+
+      await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'failed')
+      const [run] = harness.duty.duties.runsOf(DutyId(dutyId))
+      expect(run?.summary).toContain('no duty verifier registry is loaded')
+    })
   })
 
   it('narrows the run agent to the tool allowance and gates gated tools', async () => {

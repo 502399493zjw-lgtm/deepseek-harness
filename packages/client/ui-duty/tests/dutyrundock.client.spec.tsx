@@ -53,7 +53,7 @@ describe('DutyRunDock', () => {
       {...({
         useProjection: () => makeState({
           steps: [
-            { stepId: 'a', label: 'Collect', status: 'completed', attempts: 1, summary: '3 tickets' },
+            { stepId: 'a', label: 'Collect', status: 'completed', attempts: 1, summary: '3 tickets', lastVerdict: { pass: true } },
             { stepId: 'b', label: 'Report', status: 'started', attempts: 2 },
           ],
           finished: { status: 'failed', summary: 'budget exceeded' },
@@ -66,6 +66,21 @@ describe('DutyRunDock', () => {
     expect(screen.getByText('Collect — 3 tickets')).toBeTruthy()
     expect(screen.getByText(/Report/)).toBeTruthy()
     expect(screen.getByText(/已结束: failed/)).toBeTruthy()
+    expect(screen.getByText('验收通过')).toBeTruthy()
+  })
+
+  it('renders a failed verdict with its reason', () => {
+    const actions = makeActions()
+    render(<DutyRunDock
+      {...({
+        useProjection: () => makeState({
+          steps: [{ stepId: 'a', label: 'Collect', status: 'started', attempts: 1, lastVerdict: { pass: false, reason: 'no proof' } }],
+        }),
+        ...actions,
+        t,
+      } as unknown as DutyRunDockProps)}
+    />)
+    expect(screen.getByText('验收未通过 — no proof')).toBeTruthy()
   })
 
   it('submits an answer for the open human decision', async () => {

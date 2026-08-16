@@ -609,7 +609,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/duty/duty-runner/src/index.ts:60`](../packages/duty/duty-runner/src/index.ts)
+Source: [`packages/duty/duty-runner/src/index.ts:61`](../packages/duty/duty-runner/src/index.ts)
 
 <a id="deepseek-aidsh-duty-trigger"></a>
 
@@ -630,6 +630,38 @@ export interface Config {
 ```
 
 Source: [`packages/duty/duty-trigger/src/index.ts:42`](../packages/duty/duty-trigger/src/index.ts)
+
+<a id="deepseek-aidsh-duty-verify"></a>
+
+## `@deepseek-ai/dsh-duty-verify`
+
+```ts config-catalog
+/** Registry policy: which verifier the runtime consults. */
+export interface Config {
+  /** Verifier id selected for runs whose contract opts into verification. */
+  readonly verifier: string
+}
+```
+
+Source: [`packages/duty/duty-verify/src/index.ts:22`](../packages/duty/duty-verify/src/index.ts)
+
+<a id="deepseek-aidsh-duty-verify-evaluator"></a>
+
+## `@deepseek-ai/dsh-duty-verify-evaluator`
+
+Requires: `dutyVerifiers` · `subagents`
+
+```ts config-catalog
+/** Deployment policy for the evaluator. */
+export interface Config {
+  /** Subagent provider used for the evaluation child. */
+  readonly subagentProvider: string
+  /** Upper bound on the rendered evidence bundle in UTF-16 chars. */
+  readonly maxEvidenceChars: number
+}
+```
+
+Source: [`packages/duty/duty-verify-evaluator/src/index.ts:25`](../packages/duty/duty-verify-evaluator/src/index.ts)
 
 <a id="deepseek-aidsh-e2b"></a>
 

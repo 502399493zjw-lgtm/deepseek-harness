@@ -235,7 +235,7 @@ Runtime that turns observations into runs and drives each run's Session to a ter
 async startRun(dutyId: DutyId, cause: DutyRunCause, options: { readonly wait?: boolean } = {}): Promise<DutyRun>
 ```
 
-Source: [`packages/duty/duty-runner/src/index.ts:157`](../../packages/duty/duty-runner/src/index.ts)
+Source: [`packages/duty/duty-runner/src/index.ts:189`](../../packages/duty/duty-runner/src/index.ts)
 
 <a id="ctxdutytriggers--dutytriggerservice"></a>
 
@@ -268,6 +268,43 @@ sweep(): Promise<void>
 ```
 
 Source: [`packages/duty/duty-trigger/src/index.ts:60`](../../packages/duty/duty-trigger/src/index.ts)
+
+<a id="ctxdutyverifiers--dutyverifierregistry"></a>
+
+### `ctx.dutyVerifiers` — `DutyVerifierRegistry`
+
+Registry of independent completion checkers. The runtime resolves the configured verifier through resolve; a missing verifier is a loud misconfiguration, never a silent pass.
+
+```ts cordis-catalog
+/**
+ * Register one completion checker.
+ * @param verifier - The checker to register under its id.
+ * @returns the disposer that unregisters it.
+ */
+register(verifier: DutyVerifier): () => void
+
+/**
+ * Registered verifier ids, in registration order.
+ * @returns the current verifier id list.
+ */
+verifierIds(): readonly string[]
+
+/**
+ * Resolve the configured verifier.
+ * @returns the selected checker, or `undefined` when nothing is registered
+ * under the configured id.
+ */
+resolve(): DutyVerifier | undefined
+
+/**
+ * Judge one reported completion through the configured verifier.
+ * @param request - the step, its summary, and the bounded evidence.
+ * @returns the verdict; throws when the configured verifier is missing.
+ */
+async verify(request: DutyVerificationRequest): Promise<DutyVerdict>
+```
+
+Source: [`packages/duty/duty-verify/src/index.ts:32`](../../packages/duty/duty-verify/src/index.ts)
 
 <a id="duty-events"></a>
 
