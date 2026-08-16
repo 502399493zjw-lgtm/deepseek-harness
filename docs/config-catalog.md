@@ -585,7 +585,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/duty/duty/src/index.ts:88`](../packages/duty/duty/src/index.ts)
+Source: [`packages/duty/duty/src/index.ts:89`](../packages/duty/duty/src/index.ts)
 
 <a id="deepseek-aidsh-duty-runner"></a>
 
