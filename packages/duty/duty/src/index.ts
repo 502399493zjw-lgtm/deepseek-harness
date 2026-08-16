@@ -13,6 +13,7 @@
 import { randomUUID } from 'node:crypto'
 import { Context, Service } from '@deepseek-ai/cordis'
 import s from '@deepseek-ai/schemastery'
+import { z } from 'zod'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import type { JsonValue, SessionId } from '@deepseek-ai/dsh-session/types'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
@@ -104,6 +105,7 @@ export type DutyErrorCode =
   | 'duty-not-runnable'
   | 'request-already-settled'
   | 'invalid-contract'
+  | 'duty-exists'
   | 'answer-not-offered'
   | 'domain-not-open'
 
@@ -266,7 +268,19 @@ export class DutyService extends TypertRemoteService {
   @Remote('create')
   async create(request: CreateDutyRequest): Promise<DutyView> {
     const now = Date.now()
-    const id = randomUUID() as DutyId
+    // A caller-supplied id makes creation idempotent: a retry names the same
+    // identity and fails as a duplicate instead of minting a second Duty.
+    const supplied = request.id
+    if (supplied !== undefined) {
+      const format = z.uuid().safeParse(supplied)
+      if (!format.success) {
+        throw new DutyError('invalid-contract', `duty id must be a uuid, got '${supplied}'`)
+      }
+      if (this.requireSpecs().get(supplied as DutyId) !== undefined) {
+        throw new DutyError('duty-exists', `duty '${supplied}' already exists`)
+      }
+    }
+    const id = (supplied ?? randomUUID()) as DutyId
     const spec: DutySpec = {
       id,
       title: request.title,

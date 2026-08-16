@@ -75,6 +75,11 @@ function renderThrown(value: unknown): string {
   return value instanceof Error ? value.message : String(value)
 }
 
+/** The optional host default-model service, read at admission time. */
+interface DefaultModelLike {
+  currentSelection(): { provider: string; model: string }
+}
+
 /**
  * The Chinese kickoff naming the trigger cause, kept verbatim from the loop
  * flow convention: the first model-visible line of every run explains why the
@@ -212,9 +217,11 @@ export class DutyRunnerService extends Service {
    * Start one run by hand, bypassing the trigger seam.
    * @param dutyId - The Duty to run.
    * @param cause - Why a human or model asked for this run.
+   * @param options - `wait` resolves only after the run settles, so a
+   * foreground caller observes the outcome rather than just the admission.
    * @returns the started run.
    */
-  async startRun(dutyId: DutyId, cause: DutyRunCause): Promise<DutyRun> {
+  async startRun(dutyId: DutyId, cause: DutyRunCause, options: { readonly wait?: boolean } = {}): Promise<DutyRun> {
     const view = this.ctx.duties.get(dutyId)
     if (view === undefined) throw new DutyError('duty-not-found', `no duty '${dutyId}'`)
     const sessionId = SessionId(randomUUID())
@@ -229,7 +236,14 @@ export class DutyRunnerService extends Service {
       throw new DutyError('duty-not-runnable', `duty '${dutyId}' cannot run: ${claim.reason}`)
     }
     await this.ctx.duties.recordTrigger({ dutyId, cause, matched: true, runId: claim.run.id })
-    this.track(this.launchRun(claim.run, view.spec))
+    // Manual starts await admission: when this resolves the run's Session and
+    // Agent exist and the kickoff is queued, so a caller that goes idle
+    // immediately afterwards does not race the run's first model request.
+    if (options.wait === true) {
+      await this.admitRunAndSettle(claim.run, view.spec)
+      return claim.run
+    }
+    await this.admitRun(claim.run, view.spec)
     return claim.run
   }
 
@@ -265,12 +279,32 @@ export class DutyRunnerService extends Service {
     if (observation.nextWakeAt !== undefined) {
       await this.ctx.duties.setNextWake(observation.dutyId, observation.nextWakeAt)
     }
-    this.track(this.launchRun(claim.run, view.spec))
+    this.trackRun(claim.run, view.spec)
+  }
+
+  /** Track one launched run so teardown can drain it before unloading. */
+  private trackRun(run: DutyRun, spec: DutySpec): void {
+    this.track(this.launchRun(run, spec))
   }
 
   /** Create the run's Session and Agent, queue the kickoff, and drive it. */
   private async launchRun(run: DutyRun, spec: DutySpec): Promise<void> {
-    const local: RunLocal = {
+    const local = this.makeLocal(run, spec)
+    this.locals.set(run.id, local)
+    try {
+      const handle = await this.admit(run, spec, local)
+      await this.driveRun(handle.agent, local)
+    } catch (error: unknown) {
+      if (this.admissionOpen) await this.failRun(local, renderThrown(error))
+      else this.ctx.logger.warn(
+        `duty-runner: run '${run.id}' failed during teardown: ${renderThrown(error)}`,
+      )
+    }
+  }
+
+  /** One run's process-local working set. */
+  private makeLocal(run: DutyRun, spec: DutySpec): RunLocal {
+    return {
       run,
       spec,
       summaries: new Map(),
@@ -278,31 +312,76 @@ export class DutyRunnerService extends Service {
       controller: new AbortController(),
       parkedRequestId: undefined,
     }
+  }
+
+  /**
+   * Admit one run: create its Session and Agent, bind the run identity, and
+   * queue the kickoff. Resolves once the run is admitted and visible.
+   * @param run - the claimed run.
+   * @param spec - the stored contract.
+   * @param local - the run's working set.
+   * @returns the live run Agent handle.
+   */
+  /**
+   * Resolve the run Agent's model selection from the host default-model
+   * service. A host without that service leaves the loop's own resolution.
+   * @returns the per-agent options to pass at creation, when resolvable.
+   */
+  private resolveAgentOptions(): { provider: string; model: string } | undefined {
+    const defaults = this.ctx.get('agentDefaultModel') as unknown as DefaultModelLike | undefined
+    const selection = defaults?.currentSelection()
+    if (selection === undefined) return undefined
+    return { provider: selection.provider, model: selection.model }
+  }
+
+  private async admit(run: DutyRun, spec: DutySpec, local: RunLocal): Promise<AgentHandle> {
+    const agentOptions = this.resolveAgentOptions()
+    const handle = await this.ctx.agents.create({
+      sessionId: run.sessionId,
+      ...(agentOptions === undefined ? {} : { agentOptions }),
+      setup: (agentCtx) => {
+        this.composeWorld(agentCtx, local)
+      },
+    })
+    this.handles.set(run.id, handle)
+    local.session = handle.agent.session
+    handle.agent.session.append('duty/run-bound', {
+      dutyId: spec.id,
+      runId: run.id,
+      cause: run.cause,
+    })
+    const kickoff = createUserMessage({
+      content: [{ type: 'text', text: renderKickoff(run.cause.reason) }],
+      source: { kind: 'duty' },
+    })
+    handle.agent.followup(kickoff)
+    return handle
+  }
+
+  /** Admit one run through the startRun entry and drive it afterwards. */
+  private async admitRun(run: DutyRun, spec: DutySpec): Promise<void> {
+    const local = this.makeLocal(run, spec)
     this.locals.set(run.id, local)
+    const handle = await this.admit(run, spec, local)
+    this.track(this.driveRunGuarded(handle.agent, local))
+  }
+
+  /** Admit one run and await its settlement for a foreground caller. */
+  private async admitRunAndSettle(run: DutyRun, spec: DutySpec): Promise<void> {
+    const local = this.makeLocal(run, spec)
+    this.locals.set(run.id, local)
+    const handle = await this.admit(run, spec, local)
+    await this.driveRunGuarded(handle.agent, local)
+  }
+
+  /** Drive one admitted run, settling a failure instead of rejecting. */
+  private async driveRunGuarded(agent: Agent, local: RunLocal): Promise<void> {
     try {
-      const handle = await this.ctx.agents.create({
-        sessionId: run.sessionId,
-        setup: (agentCtx) => {
-          this.composeWorld(agentCtx, local)
-        },
-      })
-      this.handles.set(run.id, handle)
-      local.session = handle.agent.session
-      handle.agent.session.append('duty/run-bound', {
-        dutyId: spec.id,
-        runId: run.id,
-        cause: run.cause,
-      })
-      const kickoff = createUserMessage({
-        content: [{ type: 'text', text: renderKickoff(run.cause.reason) }],
-        source: { kind: 'duty' },
-      })
-      handle.agent.followup(kickoff)
-      await this.driveRun(handle.agent, local)
+      await this.driveRun(agent, local)
     } catch (error: unknown) {
       if (this.admissionOpen) await this.failRun(local, renderThrown(error))
       else this.ctx.logger.warn(
-        `duty-runner: run '${run.id}' failed during teardown: ${renderThrown(error)}`,
+        `duty-runner: run '${local.run.id}' failed during teardown: ${renderThrown(error)}`,
       )
     }
   }
@@ -634,8 +713,10 @@ export class DutyRunnerService extends Service {
     if (target === undefined) return
     target.parkedRequestId = undefined
     try {
+      const agentOptions = this.resolveAgentOptions()
       const handle = await this.ctx.agents.resume({
         resumeSessionId: request.sessionId,
+        ...(agentOptions === undefined ? {} : { agentOptions }),
         setup: (agentCtx) => {
           this.composeWorld(agentCtx, target)
         },
@@ -676,8 +757,10 @@ export class DutyRunnerService extends Service {
       this.locals.set(run.id, local)
       if (open !== undefined) continue
       try {
+        const agentOptions = this.resolveAgentOptions()
         const handle = await this.ctx.agents.resume({
           resumeSessionId: run.sessionId,
+          ...(agentOptions === undefined ? {} : { agentOptions }),
           setup: (agentCtx) => {
             this.composeWorld(agentCtx, local)
           },

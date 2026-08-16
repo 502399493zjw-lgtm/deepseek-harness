@@ -1,0 +1,8 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "Create a duty with the fixed id snapshot-duty, activate it, start it by hand, and finish its run."
+    }
+  ]
+}

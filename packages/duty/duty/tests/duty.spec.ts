@@ -32,6 +32,27 @@ describe('duty service', () => {
   }
 
   describe('creation', () => {
+    it('honors a caller-supplied uuid as the duty id', async () => {
+      const view = await harness.duties.create(createRequest({
+        id: '5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a',
+      }))
+      expect(view.spec.id).toBe('5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a')
+    })
+
+    it('rejects a second create with the same supplied id', async () => {
+      const id = '5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a'
+      await harness.duties.create(createRequest({ id }))
+      await expect(harness.duties.create(createRequest({ id }))).rejects.toMatchObject({
+        code: 'duty-exists',
+      })
+    })
+
+    it('rejects a supplied id that is not a uuid', async () => {
+      await expect(harness.duties.create(createRequest({ id: 'not-a-uuid' }))).rejects.toMatchObject({
+        code: 'invalid-contract',
+      })
+    })
+
     it('starts a duty in draft with no runs', async () => {
       const view = await harness.duties.create(createRequest())
       expect(view.state.lifecycle).toBe('draft')

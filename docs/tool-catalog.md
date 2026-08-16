@@ -982,6 +982,10 @@ Create one Duty in draft from a complete contract: title, goal, trigger, executi
 {
   "type": "object",
   "properties": {
+    "id": {
+      "type": "string",
+      "description": "Optional caller-chosen UUID for idempotent creation."
+    },
     "title": {
       "type": "string",
       "description": "Short human-facing name."
@@ -1092,6 +1096,10 @@ Wake one active Duty now by hand. The run executes the stored body in its own Se
     "reason": {
       "type": "string",
       "description": "Why this wake is requested."
+    },
+    "wait": {
+      "type": "boolean",
+      "description": "Resolve only after the run settles, reporting its outcome."
     }
   },
   "required": [

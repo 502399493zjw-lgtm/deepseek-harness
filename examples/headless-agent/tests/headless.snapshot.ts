@@ -31,6 +31,8 @@ const ptyStreamExpected = join(ptyScenarioDir, 'stream-json.expected.jsonl')
 const ptyConfigPath = fileURLToPath(new URL('../pty.cordis.snapshot.yml', import.meta.url))
 const goalScenarioDir = join(snapshotsDir, 'goal-tools')
 const goalConfigPath = fileURLToPath(new URL('../goal.cordis.snapshot.yml', import.meta.url))
+const dutyScenarioDir = join(snapshotsDir, 'duty-tools')
+const dutyConfigPath = fileURLToPath(new URL('../duty.cordis.snapshot.yml', import.meta.url))
 const retryScenarioDir = join(snapshotsDir, 'provider-retry')
 const retryConfigPath = fileURLToPath(new URL('../retry.cordis.snapshot.yml', import.meta.url))
 const compactionScenarioDir = join(snapshotsDir, 'compaction-recovery')
@@ -697,6 +699,64 @@ describe('headless stream-json snapshots', () => {
 
     expect(result.stderr).toBe('')
     const normalized = normalizeGoalStream(result.stdout, runCwd)
+    if (refreshing) await writeFile(streamExpected, normalized)
+    expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('replays the duty create/activate/start flow and finishes the run with the pinned kickoff', async () => {
+    const prompt = await scenarioPrompt(dutyScenarioDir, 'duty-tools')
+    const streamExpected = join(dutyScenarioDir, 'stream-json.expected.jsonl')
+    let runCwd = ''
+    const result = await runLoaderSmoke({
+      label: 'duty tools headless stream-json snapshot',
+      tempDirPrefix: 'headless-snapshot-duty-tools-',
+      binScript,
+      libBinScript: binScript,
+      configPath: dutyConfigPath,
+      binArgs: [dutyConfigPath, prompt],
+      tsconfigPath,
+      env: {
+        DSH_SNAPSHOT: 'replay',
+        DSH_SNAPSHOT_FILE: join(dutyScenarioDir, 'session.jsonl'),
+        DSH_SNAPSHOT_OVERRIDE: join(dutyScenarioDir, 'replay.override.json'),
+        DSH_SNAPSHOT_CHILD_FILES: join(dutyScenarioDir, 'run-session.jsonl'),
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: (cwd) => { runCwd = cwd },
+      inspect: async (cwd) => {
+        const logs = await persistedLogs(cwd)
+        const all = logs.map(log => parseJsonl(log.content))
+        // The primary session drives the duty tools; the run session folds the
+        // duty machine and carries the pinned Chinese kickoff.
+        const runLog = all.find(records => records.some(record => record.type === 'duty/run-bound'))
+        expect(runLog).toBeDefined()
+        const primary = all.find(records => records.some(record => record.type === 'tool/call'
+          && (record.data as JsonObject | undefined)?.name === 'duty_create'))
+        expect(primary).toBeDefined()
+
+        const calls = (primary ?? []).filter(record => record.type === 'tool/call')
+          .map(record => (record.data as JsonObject | undefined)?.name)
+        expect(calls).toEqual(['duty_create', 'duty_set_lifecycle', 'duty_start'])
+
+        const kickoff = (runLog ?? []).find(record => record.type === 'user/message'
+          && JSON.stringify(record.data).includes('开始执行你的 loop flow'))
+        expect(kickoff).toBeDefined()
+        const kickoffText = (kickoff?.data as JsonObject | undefined)?.content as JsonObject[] | undefined
+        expect(kickoffText?.[0]).toMatchObject({
+          type: 'text',
+          text: '开始执行你的 loop flow。本次触发原因:snapshot proof。',
+        })
+
+        const finished = (runLog ?? []).find(record => record.type === 'duty/run-finish')
+        expect((finished?.data as JsonObject | undefined)?.status).toBe('succeeded')
+        const stepDone = (runLog ?? []).find(record => record.type === 'duty/step'
+          && (record.data as JsonObject | undefined)?.status === 'completed')
+        expect(stepDone).toBeDefined()
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const normalized = normalizeHeadlessStream(result.stdout, runCwd)
     if (refreshing) await writeFile(streamExpected, normalized)
     expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)

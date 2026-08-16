@@ -1,0 +1,158 @@
+[
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 0,
+        "id": "call_duty_create",
+        "name": "duty_create",
+        "argumentsDelta": "{\"id\":\"5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a\",\"title\":\"Snapshot proof\",\"goal\":\"Pin the duty kickoff.\",\"trigger\":{\"kind\":\"manual\",\"description\":\"snapshot proof\"},\"body\":{\"steps\":[{\"id\":\"collect\",\"kind\":\"agent\",\"label\":\"Collect\",\"prompt\":\"Collect the list.\"}]},\"tool_policy\":{\"allow\":[],\"gated\":[]}}"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "call_duty_create",
+          "name": "duty_create",
+          "arguments": "{\"id\":\"5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a\",\"title\":\"Snapshot proof\",\"goal\":\"Pin the duty kickoff.\",\"trigger\":{\"kind\":\"manual\",\"description\":\"snapshot proof\"},\"body\":{\"steps\":[{\"id\":\"collect\",\"kind\":\"agent\",\"label\":\"Collect\",\"prompt\":\"Collect the list.\"}]},\"tool_policy\":{\"allow\":[],\"gated\":[]}}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 15,
+          "outputTokens": 6
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 0,
+        "id": "call_duty_activate",
+        "name": "duty_set_lifecycle",
+        "argumentsDelta": "{\"duty_id\":\"5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a\",\"lifecycle\":\"active\"}"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "call_duty_activate",
+          "name": "duty_set_lifecycle",
+          "arguments": "{\"duty_id\":\"5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a\",\"lifecycle\":\"active\"}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 20,
+          "outputTokens": 8
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 0,
+        "id": "call_duty_start",
+        "name": "duty_start",
+        "argumentsDelta": "{\"duty_id\":\"5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a\",\"reason\":\"snapshot proof\",\"wait\":true}"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "call_duty_start",
+          "name": "duty_start",
+          "arguments": "{\"duty_id\":\"5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a\",\"reason\":\"snapshot proof\",\"wait\":true}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 25,
+          "outputTokens": 4
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "text"
+      },
+      {
+        "type": "text-delta",
+        "index": 0,
+        "text": "DUTY READY"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "text",
+          "text": "DUTY READY"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 30,
+          "outputTokens": 2
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "stop"
+        }
+      }
+    ]
+  }
+]

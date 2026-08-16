@@ -32,7 +32,7 @@ function renderError(error: unknown): string {
 /** Register the Duty tools with the host tool registry. */
 /** The one run-runtime method these surfaces reach, kept optional. */
 interface DutyRunnerLike {
-  startRun(dutyId: string, cause: { kind: 'manual'; reason: string }): Promise<{ id: string }>
+  startRun(dutyId: string, cause: { kind: 'manual'; reason: string }, options?: { wait?: boolean }): Promise<{ id: string }>
 }
 
 /** Resolve the optional run runtime without binding this package to it. */
@@ -76,6 +76,7 @@ export function apply(ctx: Context): void {
       + 'body, tool policy, and optional limits. The Host validates the contract; a draft '
       + 'never wakes until duty_set_lifecycle activates it.',
     parameters: {
+      id: { type: 'string', description: 'Optional caller-chosen UUID for idempotent creation.' },
       title: { type: 'string', required: true, description: 'Short human-facing name.' },
       goal: { type: 'string', required: true, description: 'Intended outcome in the user\'s own terms.' },
       scope: { type: 'string', description: 'What the Duty must not do.' },
@@ -112,6 +113,7 @@ export function apply(ctx: Context): void {
     },
     execute: async (args: unknown): Promise<JsonValue> => {
       const input = args as {
+        id?: string
         title: string
         goal: string
         scope?: string
@@ -125,6 +127,7 @@ export function apply(ctx: Context): void {
       }
       try {
         const view = await ctx.duties.create({
+          ...(input.id === undefined ? {} : { id: input.id }),
           title: input.title,
           goal: input.goal,
           ...(input.scope === undefined ? {} : { scope: input.scope }),
@@ -192,19 +195,20 @@ export function apply(ctx: Context): void {
     parameters: {
       duty_id: { type: 'string', required: true, description: 'The Duty id.' },
       reason: { type: 'string', required: true, description: 'Why this wake is requested.' },
+      wait: { type: 'boolean', description: 'Resolve only after the run settles, reporting its outcome.' },
     },
     output: {
       schema: { type: 'json' },
       render: (_args: unknown, value: unknown) => [{ type: 'text', text: JSON.stringify(value) }],
     },
     execute: async (args: unknown): Promise<JsonValue> => {
-      const { duty_id: dutyId, reason } = args as { duty_id: string; reason: string }
+      const { duty_id: dutyId, reason, wait } = args as { duty_id: string; reason: string; wait?: boolean }
       const runner = resolveRunner(ctx)
       if (runner === undefined) {
         return { ok: false, error: 'the duty run runtime is not loaded; add @deepseek-ai/dsh-duty-runner' }
       }
       try {
-        const run = await runner.startRun(DutyId(dutyId), { kind: 'manual', reason })
+        const run = await runner.startRun(DutyId(dutyId), { kind: 'manual', reason }, { wait: wait === true })
         return { ok: true, runId: run.id }
       } catch (error: unknown) {
         return error instanceof DutyError ? { ok: false, code: error.code, error: error.message }

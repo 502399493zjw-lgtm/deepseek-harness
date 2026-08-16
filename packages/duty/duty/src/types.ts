@@ -327,6 +327,12 @@ export type DutySkipReason =
 
 /** Fields accepted when creating a Duty; the Host assigns the rest. */
 export interface CreateDutyRequest {
+  /**
+   * Optional caller-supplied identity (a UUID) for idempotent creation: a
+   * retry with the same id rejects with `duty-exists` instead of minting a
+   * second Duty. The Host validates the format and uniqueness.
+   */
+  readonly id?: string
   readonly title: string
   readonly goal: string
   readonly scope?: string
