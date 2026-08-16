@@ -13,6 +13,7 @@
 import { randomUUID } from 'node:crypto'
 import { Context, Service } from '@deepseek-ai/cordis'
 import s from '@deepseek-ai/schemastery'
+import { z } from 'zod'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
@@ -20,6 +21,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-session-persistence'
+import type {} from '@deepseek-ai/dsh-session-projection'
 import {
   DutyError,
   dutyBodySchema,
@@ -37,6 +39,11 @@ import type {
 import type { DutyTriggerObservation } from '@deepseek-ai/dsh-duty-trigger'
 import './session-events.ts'
 import { flattenStepIds, foldRunMachine, nextIncompleteStepId } from './machine.ts'
+import {
+  applyDutyRunProjection,
+  DUTY_RUN_PROJECTION_VERSION,
+  dutyRunProjectionSchema,
+} from './projection.ts'
 import type { DutyRunMachineState } from './types.ts'
 
 export type * from './types.ts'
@@ -184,6 +191,19 @@ export class DutyRunnerService extends Service {
     this.ctx.on('duty/human-answered', (request: HumanRequest) => {
       if (!this.admissionOpen) return
       void this.handleAnswer(request)
+    })
+    // The `duty` projection unit: live run state for clients over any run's
+    // Session. Optional — headless assemblies without a projection registry
+    // stay unaffected.
+    this.ctx.inject(['sessionProjections'], (projectionCtx) => {
+      projectionCtx.sessionProjections.register<'duty', DutyRunMachineState | undefined>({
+        key: 'duty',
+        schema: dutyRunProjectionSchema as unknown as z.ZodType<DutyRunMachineState | undefined>,
+        init: () => undefined,
+        apply: applyDutyRunProjection,
+        view: state => state,
+        stateVersion: DUTY_RUN_PROJECTION_VERSION,
+      })
     })
     await this.reconcileInterruptedRuns()
   }
@@ -578,7 +598,7 @@ export class DutyRunnerService extends Service {
       status: 'succeeded',
       summary,
       costUsd,
-      cursor: { lastStepId: lastCompleted?.stepId },
+      ...(lastCompleted === undefined ? {} : { cursor: { lastStepId: lastCompleted.stepId } }),
       ...(local.adaptedBody === undefined ? {} : { adapted: true }),
     })
     await this.releaseHandle(local.run.id)

@@ -1,0 +1,91 @@
+.dock {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--dsw-space-2);
+  padding: var(--dsw-space-1) 0;
+  font-size: var(--dsw-font-size-sm);
+  color: var(--dsw-color-text-secondary);
+}
+
+.title {
+  font-weight: 600;
+  color: var(--dsw-color-text-primary);
+}
+
+.steps {
+  white-space: nowrap;
+}
+
+.finished {
+  color: var(--dsw-color-text-secondary);
+}
+
+.error {
+  color: var(--dsw-color-text-danger);
+}
+
+.stepList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-1);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: baseline;
+  gap: var(--dsw-space-2);
+}
+
+.step[data-status='completed'] .mark {
+  color: var(--dsw-color-text-success);
+}
+
+.step[data-status='failed'] .mark {
+  color: var(--dsw-color-text-danger);
+}
+
+.mark {
+  width: 1em;
+  text-align: center;
+}
+
+.answerForm {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  width: 100%;
+}
+
+.question {
+  flex: 1;
+  color: var(--dsw-color-text-primary);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--dsw-space-1) var(--dsw-space-2);
+  border: 1px solid var(--dsw-color-border);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-color-bg-input);
+  color: var(--dsw-color-text-primary);
+}
+
+.submit {
+  padding: var(--dsw-space-1) var(--dsw-space-2);
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-color-bg-accent);
+  color: var(--dsw-color-text-on-accent);
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

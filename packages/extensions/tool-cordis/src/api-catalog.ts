@@ -544,31 +544,31 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Durable Duty contracts, operational state, run history, and human decisions.\n\nEvery mutation that must not interleave with another runs through the domain\'s `update` write chain, so a claim, a settle, and an answer arriving together are serialized by the medium rather than by a read-then-write race.',
     methods: [
       {
-        signature: 'list(): readonly DutyView[]',
+        signature: '@Remote(\'list\') list(): readonly DutyView[]',
         description: 'List every Duty with its current state, in creation order.',
         parameters: [],
         returns: 'frozen Duty views.',
       },
       {
-        signature: 'get(id: DutyId): DutyView | undefined',
+        signature: '@Remote(\'get\') get(id: DutyId): DutyView | undefined',
         description: 'Read one Duty and its state.',
         parameters: [{ name: 'id', description: 'Duty identity.' }],
         returns: 'the frozen view, or `undefined` when no such Duty exists.',
       },
       {
-        signature: 'async create(request: CreateDutyRequest): Promise<DutyView>',
+        signature: '@Remote(\'create\') async create(request: CreateDutyRequest): Promise<DutyView>',
         description: 'Create one Duty in `draft` and its initial state.',
         parameters: [{ name: 'request', description: 'Validated contract fields; the Host assigns identity.' }],
         returns: 'the frozen created view.',
       },
       {
-        signature: 'async edit(id: DutyId, expected: DutyVersion, request: EditDutyRequest): Promise<DutyView>',
+        signature: '@Remote(\'edit\') async edit(id: DutyId, expected: DutyVersion, request: EditDutyRequest): Promise<DutyView>',
         description: 'Replace the named contract fields of one Duty under compare-and-set.',
         parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'expected', description: 'The exact version the caller intends to replace.' }, { name: 'request', description: 'Fields to replace.' }],
         returns: 'the frozen updated view.',
       },
       {
-        signature: 'async setLifecycle( id: DutyId, lifecycle: DutyLifecycle, reason?: DutyPauseReason, ): Promise<DutyState>',
+        signature: '@Remote(\'setLifecycle\') async setLifecycle( id: DutyId, lifecycle: DutyLifecycle, reason?: DutyPauseReason, ): Promise<DutyState>',
         description: 'Move one Duty to a new lifecycle, recording why when it pauses.',
         parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'lifecycle', description: 'The lifecycle to enter.' }, { name: 'reason', description: 'Required when entering `paused`.' }],
         returns: 'the frozen updated state.',
@@ -586,13 +586,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the started run, or the reason no run started.',
       },
       {
-        signature: 'async settle( id: DutyId, runId: DutyRunId, outcome: { readonly status: DutyRunStatus readonly summary?: string readonly costUsd?: number readonly cursor?: unknown readonly adapted?: boolean readonly pause?: DutyPauseReason }, ): Promise<DutyState>',
+        signature: 'async settle( id: DutyId, runId: DutyRunId, outcome: { readonly status: DutyRunStatus readonly summary?: string readonly costUsd?: number readonly cursor?: JsonValue readonly adapted?: boolean readonly pause?: DutyPauseReason }, ): Promise<DutyState>',
         description: 'Settle one run and apply the Duty\'s failure, budget, and cursor policy.\n\nThe cursor advances only when the run succeeded, so a crash or failure mid-run never moves the Duty past work it did not finish.',
         parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'runId', description: 'The run being settled.' }, { name: 'outcome', description: 'Final status, summary, cost, and any committed cursor.' }],
         returns: 'the frozen state after settlement.',
       },
       {
-        signature: 'runsOf(id: DutyId): readonly DutyRun[]',
+        signature: '@Remote(\'runsOf\') runsOf(id: DutyId): readonly DutyRun[]',
         description: 'Read one Duty\'s run history, newest first.',
         parameters: [{ name: 'id', description: 'Duty identity.' }],
         returns: 'frozen run records.',
@@ -604,19 +604,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the frozen open request.',
       },
       {
-        signature: 'async answer(dutyId: DutyId, requestId: HumanRequestId, answer: string): Promise<HumanRequest>',
+        signature: '@Remote(\'answer\') async answer(dutyId: DutyId, requestId: HumanRequestId, answer: string): Promise<HumanRequest>',
         description: 'Answer one open human decision.',
         parameters: [{ name: 'dutyId', description: 'Duty owning the request.' }, { name: 'requestId', description: 'The request being answered.' }, { name: 'answer', description: 'The human\'s verbatim answer.' }],
         returns: 'the frozen answered request.',
       },
       {
-        signature: 'requestsOf(id: DutyId): readonly HumanRequest[]',
+        signature: '@Remote(\'requestsOf\') requestsOf(id: DutyId): readonly HumanRequest[]',
         description: 'List one Duty\'s human decisions, newest first.',
         parameters: [{ name: 'id', description: 'Duty identity.' }],
         returns: 'frozen request records.',
       },
       {
-        signature: 'openRequests(): readonly HumanRequest[]',
+        signature: '@Remote(\'openRequests\') openRequests(): readonly HumanRequest[]',
         description: 'List every open human decision across all Duties, newest first.',
         parameters: [],
         returns: 'frozen open request records.',
@@ -628,13 +628,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the frozen recorded event.',
       },
       {
-        signature: 'triggerEventsOf(id: DutyId): readonly DutyTriggerEvent[]',
+        signature: '@Remote(\'start\') async start(id: DutyId, reason: string): Promise< { ok: true, runId: DutyRunId } | { ok: false, code: string, error: string } >',
+        description: 'Wake one active Duty by hand through the optional run runtime. The Duty domain itself never starts a run: the runtime owns Session and Agent creation, so this verb reports a missing runtime instead of executing.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'reason', description: 'Why a human or model asked for this run.' }],
+        returns: 'the started run id, or a named failure when no runtime is loaded or the Duty cannot run.',
+      },
+      {
+        signature: '@Remote(\'triggerEventsOf\') triggerEventsOf(id: DutyId): readonly DutyTriggerEvent[]',
         description: 'List one Duty\'s trigger audit history, newest first.',
         parameters: [{ name: 'id', description: 'Duty identity.' }],
         returns: 'frozen trigger events.',
       },
       {
-        signature: 'async remove(id: DutyId): Promise<boolean>',
+        signature: '@Remote(\'remove\') async remove(id: DutyId): Promise<boolean>',
         description: 'Remove one Duty and every record it owns.',
         parameters: [{ name: 'id', description: 'Duty identity.' }],
         returns: '`true` when a Duty was removed.',
@@ -3228,7 +3234,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DutyState',
-    declaration: 'export interface DutyState {\n    readonly dutyId: DutyId;\n    readonly lifecycle: DutyLifecycle;\n    readonly pausedReason?: DutyPauseReason;\n    readonly runCount: number;\n    readonly running: boolean;\n    readonly lastRunId?: DutyRunId;\n    readonly lastRunAt?: number;\n    readonly lastOutcome?: DutyRunStatus;\n    readonly nextWakeAt?: number;\n    readonly consecutiveFailures: number;\n    readonly cursor?: unknown;\n}',
+    declaration: 'export interface DutyState {\n    readonly dutyId: DutyId;\n    readonly lifecycle: DutyLifecycle;\n    readonly pausedReason?: DutyPauseReason;\n    readonly runCount: number;\n    readonly running: boolean;\n    readonly lastRunId?: DutyRunId;\n    readonly lastRunAt?: number;\n    readonly lastOutcome?: DutyRunStatus;\n    readonly nextWakeAt?: number;\n    readonly consecutiveFailures: number;\n    readonly cursor?: JsonValue;\n}',
   },
   {
     name: 'DutyStep',

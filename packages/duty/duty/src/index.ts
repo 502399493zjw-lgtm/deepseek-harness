@@ -13,7 +13,8 @@
 import { randomUUID } from 'node:crypto'
 import { Context, Service } from '@deepseek-ai/cordis'
 import s from '@deepseek-ai/schemastery'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
+import type { JsonValue, SessionId } from '@deepseek-ai/dsh-session/types'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
 import {
   dutyDomainSpec,
@@ -128,6 +129,11 @@ export type DutyClaim =
   | { readonly claimed: true; readonly run: DutyRun }
   | { readonly claimed: false; readonly reason: DutySkipReason }
 
+/** Render an unknown failure for process-local diagnostics only. */
+function renderThrown(value: unknown): string {
+  return value instanceof Error ? value.message : String(value)
+}
+
 /** Freeze one spec before it crosses the service boundary. */
 function snapshotSpec(spec: DutySpec): DutySpec {
   return Object.freeze({ ...spec, escalation: Object.freeze([...spec.escalation]) })
@@ -184,7 +190,7 @@ function validateSpec(spec: DutySpec): DutySpec {
  * domain's `update` write chain, so a claim, a settle, and an answer arriving
  * together are serialized by the medium rather than by a read-then-write race.
  */
-export class DutyService extends Service {
+export class DutyService extends TypertRemoteService {
   static inject = ['storageDomain']
 
   /** Loader validation for the required Duty defaults and retention policy. */
@@ -225,6 +231,7 @@ export class DutyService extends Service {
    * List every Duty with its current state, in creation order.
    * @returns frozen Duty views.
    */
+  @Remote('list')
   list(): readonly DutyView[] {
     const specs = this.requireSpecs()
     const state = this.requireState()
@@ -243,6 +250,7 @@ export class DutyService extends Service {
    * @param id - Duty identity.
    * @returns the frozen view, or `undefined` when no such Duty exists.
    */
+  @Remote('get')
   get(id: DutyId): DutyView | undefined {
     const spec = this.requireSpecs().get(id)
     const current = this.requireState().get(id)
@@ -255,6 +263,7 @@ export class DutyService extends Service {
    * @param request - Validated contract fields; the Host assigns identity.
    * @returns the frozen created view.
    */
+  @Remote('create')
   async create(request: CreateDutyRequest): Promise<DutyView> {
     const now = Date.now()
     const id = randomUUID() as DutyId
@@ -299,6 +308,7 @@ export class DutyService extends Service {
    * @param request - Fields to replace.
    * @returns the frozen updated view.
    */
+  @Remote('edit')
   async edit(id: DutyId, expected: DutyVersion, request: EditDutyRequest): Promise<DutyView> {
     const next = await this.requireSpecs().update(id, (current) => {
       if (current.version !== expected) {
@@ -342,6 +352,7 @@ export class DutyService extends Service {
    * @param reason - Required when entering `paused`.
    * @returns the frozen updated state.
    */
+  @Remote('setLifecycle')
   async setLifecycle(
     id: DutyId,
     lifecycle: DutyLifecycle,
@@ -448,7 +459,7 @@ export class DutyService extends Service {
       readonly status: DutyRunStatus
       readonly summary?: string
       readonly costUsd?: number
-      readonly cursor?: unknown
+      readonly cursor?: JsonValue
       readonly adapted?: boolean
       readonly pause?: DutyPauseReason
     },
@@ -500,6 +511,7 @@ export class DutyService extends Service {
    * @param id - Duty identity.
    * @returns frozen run records.
    */
+  @Remote('runsOf')
   runsOf(id: DutyId): readonly DutyRun[] {
     const row = this.requireRuns().get(id)
     if (row === undefined) return Object.freeze([])
@@ -547,6 +559,7 @@ export class DutyService extends Service {
    * @param answer - The human's verbatim answer.
    * @returns the frozen answered request.
    */
+  @Remote('answer')
   async answer(dutyId: DutyId, requestId: HumanRequestId, answer: string): Promise<HumanRequest> {
     let answered: HumanRequest | undefined
     await this.requireHumanRequests().update(dutyId, (row) => {
@@ -580,6 +593,7 @@ export class DutyService extends Service {
    * @param id - Duty identity.
    * @returns frozen request records.
    */
+  @Remote('requestsOf')
   requestsOf(id: DutyId): readonly HumanRequest[] {
     const row = this.requireHumanRequests().get(id)
     if (row === undefined) return Object.freeze([])
@@ -590,6 +604,7 @@ export class DutyService extends Service {
    * List every open human decision across all Duties, newest first.
    * @returns frozen open request records.
    */
+  @Remote('openRequests')
   openRequests(): readonly HumanRequest[] {
     const open: HumanRequest[] = []
     for (const [, row] of this.requireHumanRequests().entries()) {
@@ -636,10 +651,38 @@ export class DutyService extends Service {
   }
 
   /**
+   * Wake one active Duty by hand through the optional run runtime. The Duty
+   * domain itself never starts a run: the runtime owns Session and Agent
+   * creation, so this verb reports a missing runtime instead of executing.
+   * @param id - Duty identity.
+   * @param reason - Why a human or model asked for this run.
+   * @returns the started run id, or a named failure when no runtime is
+   * loaded or the Duty cannot run.
+   */
+  @Remote('start')
+  async start(id: DutyId, reason: string): Promise<
+    { ok: true; runId: DutyRunId } | { ok: false; code: string; error: string }
+  > {
+    const runner = this.ctx.get('dutyRunner') as
+      { startRun(dutyId: DutyId, cause: DutyRunCause): Promise<DutyRun> } | undefined
+    if (runner === undefined) {
+      return { ok: false, code: 'runner-not-loaded', error: 'the duty run runtime is not loaded' }
+    }
+    try {
+      const run = await runner.startRun(id, { kind: 'manual', reason })
+      return { ok: true, runId: run.id }
+    } catch (error: unknown) {
+      if (error instanceof DutyError) return { ok: false, code: error.code, error: error.message }
+      return { ok: false, code: 'start-failed', error: renderThrown(error) }
+    }
+  }
+
+  /**
    * List one Duty's trigger audit history, newest first.
    * @param id - Duty identity.
    * @returns frozen trigger events.
    */
+  @Remote('triggerEventsOf')
   triggerEventsOf(id: DutyId): readonly DutyTriggerEvent[] {
     const row = this.requireTriggerEvents().get(id)
     if (row === undefined) return Object.freeze([])
@@ -652,6 +695,7 @@ export class DutyService extends Service {
    * @param id - Duty identity.
    * @returns `true` when a Duty was removed.
    */
+  @Remote('remove')
   async remove(id: DutyId): Promise<boolean> {
     const existed = this.requireSpecs().get(id) !== undefined
     await this.requireSpecs().delete(id)

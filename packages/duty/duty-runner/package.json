@@ -27,7 +27,11 @@
       "default": "./lib/types/types.js"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./client": {
+      "types": "./lib/types/client.d.ts",
+      "default": "./lib/types/client.js"
+    }
   },
   "files": [
     "lib/index.js",
@@ -47,10 +51,12 @@
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-session-persistence": "workspace:^",
     "@deepseek-ai/dsh-subagent": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^"
+    "@deepseek-ai/dsh-tools": "workspace:^",
+    "@deepseek-ai/dsh-session-projection": "workspace:^"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@deepseek-ai/schemastery": "workspace:^",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
@@ -63,6 +69,7 @@
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-session-persistence": "workspace:^",
     "@deepseek-ai/dsh-subagent": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^"
+    "@deepseek-ai/dsh-tools": "workspace:^",
+    "@deepseek-ai/dsh-session-projection": "workspace:^"
   }
 }

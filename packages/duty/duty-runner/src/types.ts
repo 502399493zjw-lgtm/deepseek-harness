@@ -37,6 +37,16 @@ export interface DutyHumanWait {
   readonly question: string
 }
 
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionMap {
+    /**
+     * One run's live machine state folded from the duty/* events of the run's
+     * own Session; `undefined` when the Session is not a run.
+     */
+    duty: DutyRunMachineState | undefined
+  }
+}
+
 /**
  * The complete machine state of one run, folded from its Session log. The log
  * is the only authority: this state is recomputed after every idle boundary

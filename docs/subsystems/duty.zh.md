@@ -77,21 +77,21 @@ Every mutation that must not interleave with another runs through the domain's `
  * List every Duty with its current state, in creation order.
  * @returns frozen Duty views.
  */
-list(): readonly DutyView[]
+@Remote('list') list(): readonly DutyView[]
 
 /**
  * Read one Duty and its state.
  * @param id - Duty identity.
  * @returns the frozen view, or `undefined` when no such Duty exists.
  */
-get(id: DutyId): DutyView | undefined
+@Remote('get') get(id: DutyId): DutyView | undefined
 
 /**
  * Create one Duty in `draft` and its initial state.
  * @param request - Validated contract fields; the Host assigns identity.
  * @returns the frozen created view.
  */
-async create(request: CreateDutyRequest): Promise<DutyView>
+@Remote('create') async create(request: CreateDutyRequest): Promise<DutyView>
 
 /**
  * Replace the named contract fields of one Duty under compare-and-set.
@@ -100,7 +100,7 @@ async create(request: CreateDutyRequest): Promise<DutyView>
  * @param request - Fields to replace.
  * @returns the frozen updated view.
  */
-async edit(id: DutyId, expected: DutyVersion, request: EditDutyRequest): Promise<DutyView>
+@Remote('edit') async edit(id: DutyId, expected: DutyVersion, request: EditDutyRequest): Promise<DutyView>
 
 /**
  * Move one Duty to a new lifecycle, recording why when it pauses.
@@ -109,7 +109,7 @@ async edit(id: DutyId, expected: DutyVersion, request: EditDutyRequest): Promise
  * @param reason - Required when entering `paused`.
  * @returns the frozen updated state.
  */
-async setLifecycle( id: DutyId, lifecycle: DutyLifecycle, reason?: DutyPauseReason, ): Promise<DutyState>
+@Remote('setLifecycle') async setLifecycle( id: DutyId, lifecycle: DutyLifecycle, reason?: DutyPauseReason, ): Promise<DutyState>
 
 /**
  * Record when this Duty's trigger may next fire.
@@ -142,14 +142,14 @@ async claim(id: DutyId, sessionId: SessionId, cause: DutyRunCause): Promise<Duty
  * @param outcome - Final status, summary, cost, and any committed cursor.
  * @returns the frozen state after settlement.
  */
-async settle( id: DutyId, runId: DutyRunId, outcome: { readonly status: DutyRunStatus readonly summary?: string readonly costUsd?: number readonly cursor?: unknown readonly adapted?: boolean readonly pause?: DutyPauseReason }, ): Promise<DutyState>
+async settle( id: DutyId, runId: DutyRunId, outcome: { readonly status: DutyRunStatus readonly summary?: string readonly costUsd?: number readonly cursor?: JsonValue readonly adapted?: boolean readonly pause?: DutyPauseReason }, ): Promise<DutyState>
 
 /**
  * Read one Duty's run history, newest first.
  * @param id - Duty identity.
  * @returns frozen run records.
  */
-runsOf(id: DutyId): readonly DutyRun[]
+@Remote('runsOf') runsOf(id: DutyId): readonly DutyRun[]
 
 /**
  * Open one durable human decision and park its run.
@@ -165,20 +165,20 @@ async ask(request: { readonly dutyId: DutyId readonly runId: DutyRunId readonly 
  * @param answer - The human's verbatim answer.
  * @returns the frozen answered request.
  */
-async answer(dutyId: DutyId, requestId: HumanRequestId, answer: string): Promise<HumanRequest>
+@Remote('answer') async answer(dutyId: DutyId, requestId: HumanRequestId, answer: string): Promise<HumanRequest>
 
 /**
  * List one Duty's human decisions, newest first.
  * @param id - Duty identity.
  * @returns frozen request records.
  */
-requestsOf(id: DutyId): readonly HumanRequest[]
+@Remote('requestsOf') requestsOf(id: DutyId): readonly HumanRequest[]
 
 /**
  * List every open human decision across all Duties, newest first.
  * @returns frozen open request records.
  */
-openRequests(): readonly HumanRequest[]
+@Remote('openRequests') openRequests(): readonly HumanRequest[]
 
 /**
  * Record one waking decision, including a decision not to run.
@@ -188,23 +188,34 @@ openRequests(): readonly HumanRequest[]
 async recordTrigger(event: { readonly dutyId: DutyId readonly cause: DutyRunCause readonly matched: boolean readonly skippedReason?: DutySkipReason readonly runId?: DutyRunId }): Promise<DutyTriggerEvent>
 
 /**
+ * Wake one active Duty by hand through the optional run runtime. The Duty
+ * domain itself never starts a run: the runtime owns Session and Agent
+ * creation, so this verb reports a missing runtime instead of executing.
+ * @param id - Duty identity.
+ * @param reason - Why a human or model asked for this run.
+ * @returns the started run id, or a named failure when no runtime is
+ * loaded or the Duty cannot run.
+ */
+@Remote('start') async start(id: DutyId, reason: string): Promise< { ok: true, runId: DutyRunId } | { ok: false, code: string, error: string } >
+
+/**
  * List one Duty's trigger audit history, newest first.
  * @param id - Duty identity.
  * @returns frozen trigger events.
  */
-triggerEventsOf(id: DutyId): readonly DutyTriggerEvent[]
+@Remote('triggerEventsOf') triggerEventsOf(id: DutyId): readonly DutyTriggerEvent[]
 
 /**
  * Remove one Duty and every record it owns.
  * @param id - Duty identity.
  * @returns `true` when a Duty was removed.
  */
-async remove(id: DutyId): Promise<boolean>
+@Remote('remove') async remove(id: DutyId): Promise<boolean>
 ```
 
 Types: [SessionId](core.md)
 
-Source: [`packages/duty/duty/src/index.ts:187`](../../packages/duty/duty/src/index.ts)
+Source: [`packages/duty/duty/src/index.ts:193`](../../packages/duty/duty/src/index.ts)
 
 <a id="ctxdutyrunner--dutyrunnerservice"></a>
 
@@ -222,7 +233,7 @@ Runtime that turns observations into runs and drives each run's Session to a ter
 async startRun(dutyId: DutyId, cause: DutyRunCause): Promise<DutyRun>
 ```
 
-Source: [`packages/duty/duty-runner/src/index.ts:145`](../../packages/duty/duty-runner/src/index.ts)
+Source: [`packages/duty/duty-runner/src/index.ts:152`](../../packages/duty/duty-runner/src/index.ts)
 
 <a id="ctxdutytriggers--dutytriggerservice"></a>
 
@@ -276,7 +287,7 @@ One durable human decision was answered and is now settled. The run runtime list
 'duty/human-answered'(request: HumanRequest): void
 ```
 
-Source: [`packages/duty/duty/src/index.ts:82`](../../packages/duty/duty/src/index.ts)
+Source: [`packages/duty/duty/src/index.ts:83`](../../packages/duty/duty/src/index.ts)
 
 <a id="dutytrigger--emit"></a>
 

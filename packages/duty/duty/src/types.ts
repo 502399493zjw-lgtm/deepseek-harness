@@ -8,7 +8,7 @@
  */
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { JsonValue, SessionId } from '@deepseek-ai/dsh-session/types'
 
 /** Stable identity of one durable responsibility. */
 export type DutyId = Branded<'DutyId'>
@@ -211,10 +211,10 @@ export interface DutyState {
   /** Consecutive failed runs since the last success. */
   readonly consecutiveFailures: number
   /**
-   * Opaque progress marker advanced only by a run that completed. A crash mid
-   * run therefore never advances past unfinished work.
+   * Opaque JSON progress marker advanced only by a run that completed. A
+   * crash mid-run therefore never advances past unfinished work.
    */
-  readonly cursor?: unknown
+  readonly cursor?: JsonValue
 }
 
 /** How one run ended, or that it has not ended. */
