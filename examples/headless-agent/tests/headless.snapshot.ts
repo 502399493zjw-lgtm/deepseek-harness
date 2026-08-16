@@ -719,7 +719,10 @@ describe('headless stream-json snapshots', () => {
         DSH_SNAPSHOT: 'replay',
         DSH_SNAPSHOT_FILE: join(dutyScenarioDir, 'session.jsonl'),
         DSH_SNAPSHOT_OVERRIDE: join(dutyScenarioDir, 'replay.override.json'),
-        DSH_SNAPSHOT_CHILD_FILES: join(dutyScenarioDir, 'run-session.jsonl'),
+        DSH_SNAPSHOT_CHILD_FILES: [
+          join(dutyScenarioDir, 'run-session.jsonl'),
+          join(dutyScenarioDir, 'eval-session.jsonl'),
+        ].join(delimiter),
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
       },
       prepare: (cwd) => { runCwd = cwd },
@@ -728,7 +731,10 @@ describe('headless stream-json snapshots', () => {
         const all = logs.map(log => parseJsonl(log.content))
         // The primary session drives the duty tools; the run session folds the
         // duty machine and carries the pinned Chinese kickoff.
-        const runLog = all.find(records => records.some(record => record.type === 'duty/run-bound'))
+        // The fork provider seeds the evaluation child from the run log, so
+        // `duty/run-bound` appears in both; only the true run log carries the
+        // terminal finish.
+        const runLog = all.find(records => records.some(record => record.type === 'duty/run-finish'))
         expect(runLog).toBeDefined()
         const primary = all.find(records => records.some(record => record.type === 'tool/call'
           && (record.data as JsonObject | undefined)?.name === 'duty_create'))
@@ -749,6 +755,18 @@ describe('headless stream-json snapshots', () => {
 
         const finished = (runLog ?? []).find(record => record.type === 'duty/run-finish')
         expect((finished?.data as JsonObject | undefined)?.status).toBe('succeeded')
+        const verdict = (runLog ?? []).find(record => record.type === 'duty/verdict')
+        expect((verdict?.data as JsonObject | undefined)?.pass).toBe(true)
+
+        // The evaluation child's instruction is model-visible and pinned: the
+        // run session's verifier spawned it, and its verdict passed.
+        const evalLog = all.find(records => records.some(record => record.type === 'user/message'
+          && JSON.stringify(record.data).includes('你是一个独立的步骤验收者')))
+        expect(evalLog).toBeDefined()
+        const evalInstruction = (evalLog ?? []).find(record => record.type === 'user/message'
+          && JSON.stringify(record.data).includes('你是一个独立的步骤验收者'))
+        expect(JSON.stringify(evalInstruction?.data)).toContain('步骤:Collect')
+        expect(JSON.stringify(evalInstruction?.data)).toContain('模型自报摘要:done')
         const stepDone = (runLog ?? []).find(record => record.type === 'duty/step'
           && (record.data as JsonObject | undefined)?.status === 'completed')
         expect(stepDone).toBeDefined()

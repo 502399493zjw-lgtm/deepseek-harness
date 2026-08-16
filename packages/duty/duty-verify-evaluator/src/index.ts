@@ -54,6 +54,15 @@ interface SubagentSeamLike {
   start(provider: string, request: unknown): Promise<EvaluatorChildRun>
 }
 
+/** The request fields this verifier supplies to the subagent seam. */
+interface EvaluatorStartRequest {
+  readonly parent: unknown
+  readonly label: string
+  readonly prompt: readonly { type: 'text'; text: string }[]
+  readonly outputSchema: unknown
+  readonly signal: AbortSignal
+}
+
 /** The structured verdict the evaluation child must return. */
 const VERDICT_SCHEMA = {
   type: 'object',
@@ -133,11 +142,14 @@ export class EvaluatorDutyVerifier implements DutyVerifier {
    * valid verdict resolves to a failed verification with a reason.
    */
   async verify(request: DutyVerificationRequest): Promise<DutyVerdict> {
+    // One controller per verification: the child never outlives its verdict.
+    const controller = new AbortController()
     const run = await this.subagents.start(this.config.subagentProvider, {
       parent: request.parent,
       label: `verify ${request.step.label}`,
-      prompt: [{ type: 'text', text: renderPrompt(request, this.config.maxEvidenceChars) }],
+      prompt: [{ type: 'text', text: renderPrompt(request, this.config.maxEvidenceChars) }] as EvaluatorStartRequest['prompt'],
       outputSchema: VERDICT_SCHEMA,
+      signal: controller.signal,
     })
     try {
       const result = await run.result
@@ -155,6 +167,7 @@ export class EvaluatorDutyVerifier implements DutyVerifier {
           : {}),
       }
     } finally {
+      controller.abort()
       await run.dispose()
     }
   }

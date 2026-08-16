@@ -12,7 +12,7 @@
         "index": 0,
         "id": "call_duty_create",
         "name": "duty_create",
-        "argumentsDelta": "{\"id\":\"5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a\",\"title\":\"Snapshot proof\",\"goal\":\"Pin the duty kickoff.\",\"trigger\":{\"kind\":\"manual\",\"description\":\"snapshot proof\"},\"body\":{\"steps\":[{\"id\":\"collect\",\"kind\":\"agent\",\"label\":\"Collect\",\"prompt\":\"Collect the list.\"}]},\"tool_policy\":{\"allow\":[],\"gated\":[]}}"
+        "argumentsDelta": "{\"id\":\"5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a\",\"title\":\"Snapshot proof\",\"goal\":\"Pin the duty kickoff.\",\"trigger\":{\"kind\":\"manual\",\"description\":\"snapshot proof\"},\"body\":{\"steps\":[{\"id\":\"collect\",\"kind\":\"agent\",\"label\":\"Collect\",\"prompt\":\"Collect the list.\"}]},\"verification\":\"on\",\"tool_policy\":{\"allow\":[],\"gated\":[]}}"
       },
       {
         "type": "block-end",
@@ -21,7 +21,7 @@
           "type": "tool-call",
           "id": "call_duty_create",
           "name": "duty_create",
-          "arguments": "{\"id\":\"5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a\",\"title\":\"Snapshot proof\",\"goal\":\"Pin the duty kickoff.\",\"trigger\":{\"kind\":\"manual\",\"description\":\"snapshot proof\"},\"body\":{\"steps\":[{\"id\":\"collect\",\"kind\":\"agent\",\"label\":\"Collect\",\"prompt\":\"Collect the list.\"}]},\"tool_policy\":{\"allow\":[],\"gated\":[]}}"
+          "arguments": "{\"id\":\"5f9c4c3e-2e0a-4f7b-9c1d-3f2e1d0c9b8a\",\"title\":\"Snapshot proof\",\"goal\":\"Pin the duty kickoff.\",\"trigger\":{\"kind\":\"manual\",\"description\":\"snapshot proof\"},\"body\":{\"steps\":[{\"id\":\"collect\",\"kind\":\"agent\",\"label\":\"Collect\",\"prompt\":\"Collect the list.\"}]},\"verification\":\"on\",\"tool_policy\":{\"allow\":[],\"gated\":[]}}"
         }
       },
       {

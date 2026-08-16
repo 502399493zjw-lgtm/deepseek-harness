@@ -39,5 +39,14 @@
               subagentProvider: fork
               tokenPriceUsdPerMillion: 1
               maxRepairs: 2
+          - id: duty-verify
+            name: '@deepseek-ai/dsh-duty-verify'
+            config:
+              verifier: evaluator
+          - id: duty-verify-evaluator
+            name: '@deepseek-ai/dsh-duty-verify-evaluator'
+            config:
+              subagentProvider: fork
+              maxEvidenceChars: 12000
           - id: tool-duty
             name: '@deepseek-ai/dsh-tool-duty'
