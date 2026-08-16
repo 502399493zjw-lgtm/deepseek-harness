@@ -53,6 +53,19 @@ describe('duty verifier registry', () => {
   it('fails loud when the configured verifier is missing', async () => {
     await expect(registry.verify(request())).rejects.toThrow(/no verifier 'evaluator' is registered/)
   })
+
+  it('selects a named verifier over the configured default', async () => {
+    const verify = vi.fn(async () => ({ pass: true }))
+    registry.register({ id: 'evaluator', verify: async () => ({ pass: false }) })
+    registry.register({ id: 'strict', verify })
+    expect(await registry.verify(request(), 'strict')).toEqual({ pass: true })
+    expect(verify).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails loud when the named verifier is missing', async () => {
+    registry.register({ id: 'evaluator', verify: async () => ({ pass: true }) })
+    await expect(registry.verify(request(), 'unknown')).rejects.toThrow(/no verifier 'unknown' is registered/)
+  })
 })
 
 describe('duty verify invariant companion', () => {

@@ -81,14 +81,18 @@ export class DutyVerifierRegistry extends Service {
   }
 
   /**
-   * Judge one reported completion through the configured verifier.
+   * Judge one reported completion through the configured or the named
+   * verifier.
    * @param request - the step, its summary, and the bounded evidence.
-   * @returns the verdict; throws when the configured verifier is missing.
+   * @param verifierId - an explicit verifier id; absent, the configured
+   * default is selected.
+   * @returns the verdict; throws when the selected verifier is missing.
    */
-  async verify(request: DutyVerificationRequest): Promise<DutyVerdict> {
-    const verifier = this.resolve()
+  async verify(request: DutyVerificationRequest, verifierId?: string): Promise<DutyVerdict> {
+    const selected = verifierId ?? this.policy.verifier
+    const verifier = this.verifiers.get(selected)
     if (verifier === undefined) {
-      throw new Error(`duty-verify: no verifier '${this.policy.verifier}' is registered`)
+      throw new Error(`duty-verify: no verifier '${selected}' is registered`)
     }
     return verifier.verify(request)
   }

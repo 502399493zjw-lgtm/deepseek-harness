@@ -73,6 +73,11 @@ describe('duty service', () => {
       expect(view.spec.mode).toBe('once')
     })
 
+    it('accepts a named verifier id as the verification selector', async () => {
+      const view = await harness.duties.create(createRequest({ verification: 'strict' }))
+      expect(view.spec.verification).toBe('strict')
+    })
+
     it('applies the configured failure default when the request omits it', async () => {
       const view = await harness.duties.create(createRequest())
       expect(view.spec.limits.maxConsecutiveFailures).toBe(3)

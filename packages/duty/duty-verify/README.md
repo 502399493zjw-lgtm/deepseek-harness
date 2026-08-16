@@ -21,7 +21,7 @@ Public types are exported from the package root and `@deepseek-ai/dsh-duty-verif
 
 ## Verdicts
 
-A {@link DutyVerifier} receives the step, the model's one-line completion summary, and a bounded evidence bundle the runtime rendered from the run Session; verifiers never read the log themselves, so the request is the whole input surface. Infrastructure failures throw and the runtime treats them as a failed verification — never a silent pass.
+A {@link DutyVerifier} receives the step, the model's one-line completion summary, and a bounded evidence bundle the runtime rendered from the run Session; verifiers never read the log themselves, so the request is the whole input surface. Infrastructure failures throw and the runtime treats them as a failed verification — never a silent pass. A Duty selects a verifier through its `verification` field: `on` uses the configured default, a non-empty string names a specific registered id.
 
 ## Model Experience
 
@@ -41,5 +41,4 @@ Independent. The registry does not touch a model request prefix.
 
 ## Known Limitations and Deferred Work
 
-- **One selected verifier** — the registry resolves a single configured id; per-Duty verifier selection is deferred.
 - **No verdict appeals or re-check policy** — a failed verdict only sends the step back through repair; there is no human appeal surface yet.

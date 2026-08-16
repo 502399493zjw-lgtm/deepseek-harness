@@ -64,11 +64,13 @@ export type DutyMode = 'once' | 'standing'
 export type DutyLifecycle = 'draft' | 'active' | 'paused' | 'archived'
 
 /**
- * Whether step completion requires an independent verdict. With `on`, the run
- * runtime consults a registered verifier before accepting `duty_step_done`;
- * a failed verdict sends the step back through repair. Defaults to `off`.
+ * Whether step completion requires an independent verdict, and which verifier
+ * judges it. `off` skips verification; `on` uses the registry's configured
+ * default verifier; any other non-empty string names a specific registered
+ * verifier id. A failed verdict sends the step back through repair. Defaults
+ * to `off`.
  */
-export type DutyVerification = 'off' | 'on'
+export type DutyVerification = 'off' | 'on' | (string & {})
 
 /** Why a Duty stopped waking itself. */
 export type DutyPauseReason = 'failures' | 'budget' | 'escalation' | 'human'

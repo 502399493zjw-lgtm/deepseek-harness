@@ -208,7 +208,7 @@ export const dutySpecSchema = z.object({
   goal: nonEmpty,
   scope: nonEmpty.optional(),
   trigger: dutyTriggerSchema,
-  verification: z.union([z.literal('off'), z.literal('on')]),
+  verification: z.union([z.literal('off'), z.literal('on'), z.string().min(1)]),
   body: dutyBodySchema,
   toolPolicy: dutyToolPolicySchema,
   limits: dutyLimitsSchema,

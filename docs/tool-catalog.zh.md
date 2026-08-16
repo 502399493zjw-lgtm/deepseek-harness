@@ -1007,7 +1007,7 @@ Create one Duty in draft from a complete contract: title, goal, trigger, executi
     },
     "verification": {
       "type": "string",
-      "description": "off (default) | on — whether step completion requires an independent verifier verdict."
+      "description": "off (default) | on (the configured default verifier) | a registered verifier id."
     },
     "body": {
       "description": "Execution body: steps of kind agent (prompt required), parallel, or phase with children."

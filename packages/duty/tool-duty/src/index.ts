@@ -87,7 +87,7 @@ export function apply(ctx: Context): void {
       },
       verification: {
         type: 'string',
-        description: 'off (default) | on — whether step completion requires an independent verifier verdict.',
+        description: 'off (default) | on (the configured default verifier) | a registered verifier id.',
       },
       body: {
         type: 'json',

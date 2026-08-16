@@ -106,7 +106,7 @@ interface DefaultModelLike {
 
 /** The optional verification registry, resolved per step. */
 interface DutyVerifierRegistryLike {
-  verify(request: DutyVerificationRequest): Promise<{ pass: boolean; reason?: string }>
+  verify(request: DutyVerificationRequest, verifierId?: string): Promise<{ pass: boolean; reason?: string }>
 }
 
 /** One rendered evidence line's size budget, so a step window stays bounded. */
@@ -578,7 +578,8 @@ export class DutyRunnerService extends Service {
     step: DutyStep,
     summary: string,
   ): Promise<{ pass: boolean; reason?: string }> {
-    if (local.spec.verification !== 'on') return { pass: true }
+    const selected = local.spec.verification
+    if (selected === 'off') return { pass: true }
     const registry = this.ctx.get('dutyVerifiers') as unknown as DutyVerifierRegistryLike | undefined
     if (registry === undefined) {
       throw new Error('verification is enabled but no duty verifier registry is loaded')
@@ -591,7 +592,7 @@ export class DutyRunnerService extends Service {
       summary,
       evidence: renderEvidence(agent.session, step.id),
       parent: agent,
-    })
+    }, selected === 'on' ? undefined : selected)
     agent.session.append('duty/verdict', {
       stepId: step.id,
       pass: verdict.pass,

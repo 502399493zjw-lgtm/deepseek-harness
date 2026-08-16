@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-duty-capability.md
-2026-08-16-duty-capability.md: 4c05bcc6967f22eec881c556ea807badb543a588
-2026-08-16-duty-capability.zh.md: 682f7d5cdedbe5a9618f9d56baafb8662e6c273f
+2026-08-16-duty-capability.md: d1124f31080b161d30550a42ee64794b4beb3672
+2026-08-16-duty-capability.zh.md: 188dd5b5f4e6f805579853d3d99aa3d2f5c007e2

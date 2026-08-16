@@ -83,7 +83,7 @@ async function createRunnerHarness(options: { withVerifiers?: boolean } = {}): P
   tools: FakeTools
   scripts: Set<FollowupScript>
   sessions: Map<SessionId, FakeSession>
-  setVerifier(fn: (request: unknown) => Promise<{ pass: boolean; reason?: string }>): void
+  setVerifier(fn: (request: unknown, verifierId?: string) => Promise<{ pass: boolean; reason?: string }>): void
   waitFor: (predicate: () => boolean) => Promise<void>
   dispose(): Promise<void>
 }> {
@@ -94,10 +94,10 @@ async function createRunnerHarness(options: { withVerifiers?: boolean } = {}): P
 
   duty.ctx.provide('sessions', { flush: async () => true })
   duty.ctx.provide('sessionPersistence', {})
-  let verifyStep = async (_request: unknown) => ({ pass: true })
+  let verifyStep = async (_request: unknown, _verifierId?: string) => ({ pass: true })
   if (options.withVerifiers !== false) {
     duty.ctx.provide('dutyVerifiers', {
-      verify: async (request: unknown) => verifyStep(request),
+      verify: async (request: unknown, verifierId?: string) => verifyStep(request, verifierId),
     })
   }
   duty.ctx.provide('agents', {
@@ -150,7 +150,7 @@ async function createRunnerHarness(options: { withVerifiers?: boolean } = {}): P
     tools,
     scripts,
     sessions,
-    setVerifier: (fn: (request: unknown) => Promise<{ pass: boolean; reason?: string }>) => {
+    setVerifier: (fn: (request: unknown, verifierId?: string) => Promise<{ pass: boolean; reason?: string }>) => {
       verifyStep = fn
     },
     waitFor,
@@ -330,6 +330,35 @@ describe('duty run runtime', () => {
   })
 
   describe('independent verification', () => {
+    it('passes a named verifier id through to the registry', async () => {
+      const seenIds: Array<string | undefined> = []
+      harness.setVerifier(async (_request, verifierId) => {
+        seenIds.push(verifierId)
+        return { pass: true }
+      })
+      const { dutyId, stepId } = await activeDuty({ verification: 'custom-verifier' })
+      harness.scripts.add(completeStepScript(stepId))
+
+      trigger(dutyId)
+
+      await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'succeeded')
+      expect(seenIds).toEqual(['custom-verifier'])
+    })
+
+    it('passes no id for verification on, selecting the configured default', async () => {
+      const seenIds: Array<string | undefined> = []
+      harness.setVerifier(async (_request, verifierId) => {
+        seenIds.push(verifierId)
+        return { pass: true }
+      })
+      const { dutyId, stepId } = await activeDuty({ verification: 'on' })
+      harness.scripts.add(completeStepScript(stepId))
+
+      trigger(dutyId)
+
+      await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'succeeded')
+      expect(seenIds).toEqual([undefined])
+    })
     const verifySequence = (verdicts: Array<{ pass: boolean; reason?: string }>) => {
       let index = 0
       harness.setVerifier(async () => {
