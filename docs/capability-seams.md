@@ -7,6 +7,15 @@ A service can be a core spine service, a swappable capability seam, or a bundle/
 
 ```mermaid
 flowchart LR
+  pkg_duty["duty"]
+  svc_duties["ctx.duties<br/>Durable responsibility domain"]
+  pkg_duty_runner["duty-runner"]
+  pkg_tool_duty["tool-duty"]
+  pkg_command_duty["command-duty"]
+  pkg_duty_trigger["duty-trigger"]
+  svc_dutyTriggers["ctx.dutyTriggers<br/>Duty waking-source registry"]
+  pkg_duty_trigger_timer["duty-trigger-timer"]
+  svc_dutyRunner["ctx.dutyRunner<br/>Major-trigger run runtime"]
   pkg_attachment["attachment"]
   svc_attachments["ctx.attachments<br/>Durable binary attachment storage"]
   pkg_attachment_local["attachment-local"]
@@ -218,6 +227,10 @@ flowchart LR
   pkg_directory_picker --> svc_directoryPicker
   pkg_directory_picker_browse --> svc_directoryPicker
   pkg_directory_picker_native --> svc_directoryPicker
+  pkg_duty --> svc_duties
+  pkg_duty_runner --> svc_dutyRunner
+  pkg_duty_trigger --> svc_dutyTriggers
+  pkg_duty_trigger_timer --> svc_dutyTriggers
   pkg_e2b --> svc_e2b
   pkg_fs --> svc_fs
   pkg_fs_e2b --> svc_fs
@@ -313,6 +326,12 @@ flowchart LR
   svc_credentials --> pkg_llm_deepseek
   svc_credentials --> pkg_llm_pi_ai
   svc_directoryPicker --> pkg_apiproxy
+  svc_duties --> pkg_command_duty
+  svc_duties --> pkg_duty_runner
+  svc_duties --> pkg_tool_duty
+  svc_dutyRunner --> pkg_command_duty
+  svc_dutyRunner --> pkg_tool_duty
+  svc_dutyTriggers --> pkg_duty_runner
   svc_dynamicCordisRunner --> pkg_tool_cordis
   svc_e2b --> pkg_fs_e2b
   svc_e2b --> pkg_subprocess_e2b
@@ -411,6 +430,9 @@ flowchart LR
 
 | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.duties` | `core` | [`duty`](../packages/duty/duty) | - | [`duty-runner`](../packages/duty/duty-runner), [`tool-duty`](../packages/duty/tool-duty), [`command-duty`](../packages/duty/command-duty) | - | Owns duty contracts, operational state, run records, human decisions, and the single-run claim in the duty storage domain. |
+| `ctx.dutyTriggers` | `seam` | [`duty-trigger`](../packages/duty/duty-trigger) | [`duty-trigger-timer`](../packages/duty/duty-trigger-timer) | [`duty-runner`](../packages/duty/duty-runner) | - | Sweeps registered providers on a sub-minute cadence and publishes due observations as duty/trigger events. |
+| `ctx.dutyRunner` | `core` | [`duty-runner`](../packages/duty/duty-runner) | - | [`tool-duty`](../packages/duty/tool-duty), [`command-duty`](../packages/duty/command-duty) | - | Claims runs, drives execution bodies as agent turns and subagent fan-out, and parks on durable human decisions. |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | `host-runtime`, [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | The host commits accepted images before session events; provider adapters resolve authorized durable references into provider-native content. |
 | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | Adapters register provider implementations; the loop and compaction call the provider-neutral stream service. |
 | `ctx.tokenMeter` | `core` | [`token-meter`](../packages/llm/token-meter) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | Owns isolated per-session replay folds; pressure consumers share immutable revisioned measurements. |

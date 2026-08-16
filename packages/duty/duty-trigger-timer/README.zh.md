@@ -1,0 +1,38 @@
+# @deepseek-ai/dsh-duty-trigger-timer
+
+[English](README.md) | 中文
+
+定时唤醒源 provider:以 id `timer` 注册到 `ctx.dutyTriggers`,上报每个到期(interval 或 cron 已到)且活跃、未被占用的 standing Duty。它只读持久化 Duty 状态,因此无论是否有 Session 或 agent 在线,Duty 都能醒来。
+
+## 唤醒规则数学
+
+规则数学位于 [`src/domain.ts`](src/domain.ts),是纯确定性函数;生产读平台墙钟,测试提供显式时刻。
+
+- **interval** 的发生点锚定在创建时间:`createdAt + k·everyMs`,`k ≥ 1`,首次唤醒在创建后一个周期。睡过三个周期的 Duty 只为最近一次已过去的发生点醒来一次——绝不为每个错过的周期各醒一次——且 `nextWakeAt` 始终越过当前时刻。
+- **cron** 表达式是五个数值字段(分钟、小时、日、月、星期;0 与 7 都表示周日),支持 `*`、区间、列表与步长。日期匹配采用常见 OR 语义:两个受限日期字段都需认可该日,或只有受限的那个字段生效。匹配分钟在其整个时长内保持到期,因此注册表亚分钟的 sweep 节奏不会跳过它;错过的匹配分钟只前进、不重放。搜索范围为 {@link CRON_SEARCH_HORIZON_DAYS} 天(四年,覆盖所有闰日);无解的规则(如 2 月 30 日)不报告任何发生点。语法非法的规则在合约写入时已被 schema 拒绝,轮询时再次告警跳过,以防御手改过的持久化介质。
+
+## 轮询
+
+一次轮询读取一次 `ctx.duties.list()`,跳过所有非 standing、无 `interval`/`cron` 触发、非 `active`、`running` 或存储的 `nextWakeAt` 仍在未来的 Duty。每个到期 Duty 产生一条携带触发描述作为原因、以及计算所得 `nextWakeAt` 的观测;run 运行时保存该值,使重启后仍锚定在计划上。
+
+## 模型体验
+
+### 本地定时器状态
+
+#### 模型看到什么
+
+什么都看不到。该 provider 不注册任何工具、提示词段落、模型上下文或 Session 事件;其 `DutyTriggerObservation`s 只有在 run 运行时把它们变成 run 的 Session 后才到达模型。
+
+#### Token 影响
+
+零。任何观测、规则计算或告警都不会进入模型请求。
+
+#### KV Cache 影响
+
+独立。轮询不触及模型请求前缀。
+
+## 已知限制与待办
+
+- **单一共享节奏** — provider 按注册表唯一的 `pollIntervalMs` 被轮询,不自行启动计时器。
+- **无时区支持** — cron 匹配只用 UTC;本地时区待 Duty 携带时区字段后再支持。
+- **手写五段 cron** — 因仓库没有现成解析库、且所需操作是"此刻之后的最近一次匹配"而本地实现数值子集;若范围语义需要超出该子集,可换用维护中的库。

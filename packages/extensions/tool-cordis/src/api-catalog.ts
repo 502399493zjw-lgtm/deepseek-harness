@@ -539,6 +539,147 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'duties',
+    summary: 'Durable Duty contracts, operational state, run history, and human decisions.',
+    description: 'Durable Duty contracts, operational state, run history, and human decisions.\n\nEvery mutation that must not interleave with another runs through the domain\'s `update` write chain, so a claim, a settle, and an answer arriving together are serialized by the medium rather than by a read-then-write race.',
+    methods: [
+      {
+        signature: 'list(): readonly DutyView[]',
+        description: 'List every Duty with its current state, in creation order.',
+        parameters: [],
+        returns: 'frozen Duty views.',
+      },
+      {
+        signature: 'get(id: DutyId): DutyView | undefined',
+        description: 'Read one Duty and its state.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }],
+        returns: 'the frozen view, or `undefined` when no such Duty exists.',
+      },
+      {
+        signature: 'async create(request: CreateDutyRequest): Promise<DutyView>',
+        description: 'Create one Duty in `draft` and its initial state.',
+        parameters: [{ name: 'request', description: 'Validated contract fields; the Host assigns identity.' }],
+        returns: 'the frozen created view.',
+      },
+      {
+        signature: 'async edit(id: DutyId, expected: DutyVersion, request: EditDutyRequest): Promise<DutyView>',
+        description: 'Replace the named contract fields of one Duty under compare-and-set.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'expected', description: 'The exact version the caller intends to replace.' }, { name: 'request', description: 'Fields to replace.' }],
+        returns: 'the frozen updated view.',
+      },
+      {
+        signature: 'async setLifecycle( id: DutyId, lifecycle: DutyLifecycle, reason?: DutyPauseReason, ): Promise<DutyState>',
+        description: 'Move one Duty to a new lifecycle, recording why when it pauses.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'lifecycle', description: 'The lifecycle to enter.' }, { name: 'reason', description: 'Required when entering `paused`.' }],
+        returns: 'the frozen updated state.',
+      },
+      {
+        signature: 'async setNextWake(id: DutyId, nextWakeAt: number): Promise<DutyState>',
+        description: 'Record when this Duty\'s trigger may next fire.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'nextWakeAt', description: 'Epoch milliseconds of the next permitted wake.' }],
+        returns: 'the frozen updated state.',
+      },
+      {
+        signature: 'async claim(id: DutyId, sessionId: SessionId, cause: DutyRunCause): Promise<DutyClaim>',
+        description: 'Claim this Duty\'s single run slot and open one run record.\n\nThe claim and the run-number allocation happen inside one write-chain transform, so two triggers arriving together cannot both start a run or receive the same index.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'sessionId', description: 'The Session that will own this run\'s transcript.' }, { name: 'cause', description: 'What woke this run.' }],
+        returns: 'the started run, or the reason no run started.',
+      },
+      {
+        signature: 'async settle( id: DutyId, runId: DutyRunId, outcome: { readonly status: DutyRunStatus readonly summary?: string readonly costUsd?: number readonly cursor?: unknown readonly adapted?: boolean readonly pause?: DutyPauseReason }, ): Promise<DutyState>',
+        description: 'Settle one run and apply the Duty\'s failure, budget, and cursor policy.\n\nThe cursor advances only when the run succeeded, so a crash or failure mid-run never moves the Duty past work it did not finish.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'runId', description: 'The run being settled.' }, { name: 'outcome', description: 'Final status, summary, cost, and any committed cursor.' }],
+        returns: 'the frozen state after settlement.',
+      },
+      {
+        signature: 'runsOf(id: DutyId): readonly DutyRun[]',
+        description: 'Read one Duty\'s run history, newest first.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }],
+        returns: 'frozen run records.',
+      },
+      {
+        signature: 'async ask(request: { readonly dutyId: DutyId readonly runId: DutyRunId readonly sessionId: SessionId readonly reason: HumanRequestReason readonly question: string readonly options?: readonly string[] readonly allowFreeform?: boolean }): Promise<HumanRequest>',
+        description: 'Open one durable human decision and park its run.',
+        parameters: [{ name: 'request', description: 'The Duty, run, Session, question, and offered answers.' }],
+        returns: 'the frozen open request.',
+      },
+      {
+        signature: 'async answer(dutyId: DutyId, requestId: HumanRequestId, answer: string): Promise<HumanRequest>',
+        description: 'Answer one open human decision.',
+        parameters: [{ name: 'dutyId', description: 'Duty owning the request.' }, { name: 'requestId', description: 'The request being answered.' }, { name: 'answer', description: 'The human\'s verbatim answer.' }],
+        returns: 'the frozen answered request.',
+      },
+      {
+        signature: 'requestsOf(id: DutyId): readonly HumanRequest[]',
+        description: 'List one Duty\'s human decisions, newest first.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }],
+        returns: 'frozen request records.',
+      },
+      {
+        signature: 'openRequests(): readonly HumanRequest[]',
+        description: 'List every open human decision across all Duties, newest first.',
+        parameters: [],
+        returns: 'frozen open request records.',
+      },
+      {
+        signature: 'async recordTrigger(event: { readonly dutyId: DutyId readonly cause: DutyRunCause readonly matched: boolean readonly skippedReason?: DutySkipReason readonly runId?: DutyRunId }): Promise<DutyTriggerEvent>',
+        description: 'Record one waking decision, including a decision not to run.',
+        parameters: [{ name: 'event', description: 'The observed cause and its outcome, without identity or time.' }],
+        returns: 'the frozen recorded event.',
+      },
+      {
+        signature: 'triggerEventsOf(id: DutyId): readonly DutyTriggerEvent[]',
+        description: 'List one Duty\'s trigger audit history, newest first.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }],
+        returns: 'frozen trigger events.',
+      },
+      {
+        signature: 'async remove(id: DutyId): Promise<boolean>',
+        description: 'Remove one Duty and every record it owns.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }],
+        returns: '`true` when a Duty was removed.',
+      },
+    ],
+  },
+  {
+    key: 'dutyRunner',
+    summary: 'Runtime that turns observations into runs and drives each run\'s Session to a terminal outcome.',
+    description: 'Runtime that turns observations into runs and drives each run\'s Session to a terminal outcome. One claim from `ctx.duties` admits exactly one run; everything after the claim is this service\'s own machine.',
+    methods: [
+      {
+        signature: 'async startRun(dutyId: DutyId, cause: DutyRunCause): Promise<DutyRun>',
+        description: 'Start one run by hand, bypassing the trigger seam.',
+        parameters: [{ name: 'dutyId', description: 'The Duty to run.' }, { name: 'cause', description: 'Why a human or model asked for this run.' }],
+        returns: 'the started run.',
+      },
+    ],
+  },
+  {
+    key: 'dutyTriggers',
+    summary: 'Registry of waking sources.',
+    description: 'Registry of waking sources. Providers register idempotently; one sweep polls every registered provider once at the current wall clock and emits each returned observation. Sweeps never overlap: the next timer arms after the current sweep settles, re-reading the clock rather than accumulating drift.',
+    methods: [
+      {
+        signature: 'registerProvider(provider: DutyTriggerProvider): () => void',
+        description: 'Register one waking source.',
+        parameters: [{ name: 'provider', description: 'The provider to register under its id.' }],
+        returns: 'the disposer that unregisters it.',
+      },
+      {
+        signature: 'providerIds(): readonly string[]',
+        description: 'Registered provider ids, in registration order.',
+        parameters: [],
+        returns: 'the current provider id list.',
+      },
+      {
+        signature: 'sweep(): Promise<void>',
+        description: 'Run one complete sweep now, polling every provider at the current wall clock and emitting each observation. Concurrent callers share the one in-flight sweep.',
+        parameters: [],
+        returns: 'resolution after every provider has been polled and every observation emitted.',
+      },
+    ],
+  },
+  {
     key: 'e2b',
     summary: 'Creates one lazily consumable E2B SDK handle and deletes the sandbox at timeout or disposal.',
     description: 'Creates one lazily consumable E2B SDK handle and deletes the sandbox at timeout or disposal. Creation begins at plugin construction; adapters await getSandbox before their first operation.',
@@ -2350,6 +2491,22 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'change', description: 'domain, table (`\'\'` for global), key (`\'\'` for global), operation discriminant, and on `put` the new snapshot.' }],
   },
   {
+    name: 'duty/human-answered',
+    mode: 'emit',
+    signature: '\'duty/human-answered\'(request: HumanRequest): void',
+    summary: 'One durable human decision was answered and is now settled.',
+    description: 'One durable human decision was answered and is now settled. The run runtime listens for this to resume the parked run\'s Session.',
+    parameters: [{ name: 'request', description: 'the answered request, with the human\'s verbatim answer.' }],
+  },
+  {
+    name: 'duty/trigger',
+    mode: 'emit',
+    signature: '\'duty/trigger\'(observation: DutyTriggerObservation): void',
+    summary: 'One provider\'s waking observation, published per sweep in provider registration order.',
+    description: 'One provider\'s waking observation, published per sweep in provider registration order. Listeners consume the candidate: they may claim a run, record a skip, or ignore it; the registry makes no decision.',
+    parameters: [{ name: 'observation', description: 'the normalized waking observation.' }],
+  },
+  {
     name: 'fs/edit-intent',
     mode: 'waterfall',
     signature: '\'fs/edit-intent\'(target: FsTarget, actor: object | undefined, next: () => { version: FsVersion } | undefined | Promise<{ version: FsVersion } | undefined>): Promise<{ version: FsVersion } | undefined>',
@@ -2902,6 +3059,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface CreateAgentOptions {\n    readonly sessionId: SessionId;\n    readonly meta?: {\n        readonly cwd?: string;\n        readonly parentSession?: SessionId;\n        readonly seedLength?: number;\n        readonly origin?: \'subagent\';\n        readonly delegationDepth?: number;\n        readonly agentPreset?: string;\n    };\n    readonly seed?: readonly SessionEvent[];\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
   },
   {
+    name: 'CreateDutyRequest',
+    declaration: 'export interface CreateDutyRequest {\n    readonly title: string;\n    readonly goal: string;\n    readonly scope?: string;\n    readonly trigger: DutyTrigger;\n    readonly body: DutyBody;\n    readonly toolPolicy: DutyToolPolicy;\n    readonly limits?: Partial<DutyLimits>;\n    readonly escalation?: readonly string[];\n    readonly reporting?: string;\n    readonly projectId?: string;\n}',
+  },
+  {
     name: 'CreateGoalRequest',
     declaration: 'export interface CreateGoalRequest {\n    readonly objective: string;\n    readonly maxGoalRounds?: number;\n}',
   },
@@ -2920,6 +3081,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CredentialRef',
     declaration: 'export type CredentialRef = Branded<\'CredentialRef\'>;',
+  },
+  {
+    name: 'CronTrigger',
+    declaration: 'export interface CronTrigger {\n    readonly kind: \'cron\';\n    readonly description: string;\n    readonly expr: string;\n}',
   },
   {
     name: 'DiffCallView',
@@ -3006,6 +3171,102 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type DshEnvironmentKey = `${typeof DSH_ENV_PREFIX}${string}`;',
   },
   {
+    name: 'DutyBody',
+    declaration: 'export interface DutyBody {\n    readonly steps: readonly DutyStep[];\n}',
+  },
+  {
+    name: 'DutyClaim',
+    declaration: 'export type DutyClaim = {\n    readonly claimed: true;\n    readonly run: DutyRun;\n} | {\n    readonly claimed: false;\n    readonly reason: DutySkipReason;\n};',
+  },
+  {
+    name: 'DutyId',
+    declaration: 'export type DutyId = Branded<\'DutyId\'>;',
+  },
+  {
+    name: 'DutyLifecycle',
+    declaration: 'export type DutyLifecycle = \'draft\' | \'active\' | \'paused\' | \'archived\';',
+  },
+  {
+    name: 'DutyLimits',
+    declaration: 'export interface DutyLimits {\n    readonly maxConsecutiveFailures: number;\n    readonly budgetUsd?: number;\n}',
+  },
+  {
+    name: 'DutyMode',
+    declaration: 'export type DutyMode = \'once\' | \'standing\';',
+  },
+  {
+    name: 'DutyPauseReason',
+    declaration: 'export type DutyPauseReason = \'failures\' | \'budget\' | \'escalation\' | \'human\';',
+  },
+  {
+    name: 'DutyRun',
+    declaration: 'export interface DutyRun {\n    readonly id: DutyRunId;\n    readonly dutyId: DutyId;\n    readonly index: number;\n    readonly sessionId: SessionId;\n    readonly cause: DutyRunCause;\n    readonly status: DutyRunStatus;\n    readonly startedAt: number;\n    readonly completedAt?: number;\n    readonly summary?: string;\n    readonly adapted: boolean;\n    readonly costUsd?: number;\n}',
+  },
+  {
+    name: 'DutyRunCause',
+    declaration: 'export interface DutyRunCause {\n    readonly kind: DutyRunCauseKind;\n    readonly reason: string;\n}',
+  },
+  {
+    name: 'DutyRunCauseKind',
+    declaration: 'export type DutyRunCauseKind = \'manual\' | \'schedule\';',
+  },
+  {
+    name: 'DutyRunId',
+    declaration: 'export type DutyRunId = Branded<\'DutyRunId\'>;',
+  },
+  {
+    name: 'DutyRunStatus',
+    declaration: 'export type DutyRunStatus = \'running\' | \'waiting_for_human\' | \'succeeded\' | \'failed\' | \'canceled\';',
+  },
+  {
+    name: 'DutySkipReason',
+    declaration: 'export type DutySkipReason = \'paused\' | \'archived\' | \'running\' | \'not-due\' | \'draft\';',
+  },
+  {
+    name: 'DutySpec',
+    declaration: 'export interface DutySpec {\n    readonly id: DutyId;\n    readonly title: string;\n    readonly mode: DutyMode;\n    readonly goal: string;\n    readonly scope?: string;\n    readonly trigger: DutyTrigger;\n    readonly body: DutyBody;\n    readonly toolPolicy: DutyToolPolicy;\n    readonly limits: DutyLimits;\n    readonly escalation: readonly string[];\n    readonly reporting?: string;\n    readonly projectId?: string;\n    readonly version: DutyVersion;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n}',
+  },
+  {
+    name: 'DutyState',
+    declaration: 'export interface DutyState {\n    readonly dutyId: DutyId;\n    readonly lifecycle: DutyLifecycle;\n    readonly pausedReason?: DutyPauseReason;\n    readonly runCount: number;\n    readonly running: boolean;\n    readonly lastRunId?: DutyRunId;\n    readonly lastRunAt?: number;\n    readonly lastOutcome?: DutyRunStatus;\n    readonly nextWakeAt?: number;\n    readonly consecutiveFailures: number;\n    readonly cursor?: unknown;\n}',
+  },
+  {
+    name: 'DutyStep',
+    declaration: 'export interface DutyStep {\n    readonly id: string;\n    readonly kind: DutyStepKind;\n    readonly label: string;\n    readonly prompt?: string;\n    readonly children?: readonly DutyStep[];\n}',
+  },
+  {
+    name: 'DutyStepKind',
+    declaration: 'export type DutyStepKind = \'agent\' | \'parallel\' | \'phase\';',
+  },
+  {
+    name: 'DutyToolPolicy',
+    declaration: 'export interface DutyToolPolicy {\n    readonly allow: readonly string[];\n    readonly gated: readonly string[];\n}',
+  },
+  {
+    name: 'DutyTrigger',
+    declaration: 'export type DutyTrigger = ManualTrigger | IntervalTrigger | CronTrigger;',
+  },
+  {
+    name: 'DutyTriggerEvent',
+    declaration: 'export interface DutyTriggerEvent {\n    readonly id: string;\n    readonly dutyId: DutyId;\n    readonly cause: DutyRunCause;\n    readonly matched: boolean;\n    readonly skippedReason?: DutySkipReason;\n    readonly runId?: DutyRunId;\n    readonly createdAt: number;\n}',
+  },
+  {
+    name: 'DutyTriggerObservation',
+    declaration: 'export interface DutyTriggerObservation {\n    readonly dutyId: DutyId;\n    readonly providerId: string;\n    readonly cause: DutyRunCause;\n    readonly occurredAt: number;\n    readonly nextWakeAt?: number;\n}',
+  },
+  {
+    name: 'DutyTriggerProvider',
+    declaration: 'export interface DutyTriggerProvider {\n    readonly id: string;\n    poll(now: number): Promise<readonly DutyTriggerObservation[]>;\n}',
+  },
+  {
+    name: 'DutyVersion',
+    declaration: 'export type DutyVersion = Branded<\'DutyVersion\'>;',
+  },
+  {
+    name: 'DutyView',
+    declaration: 'export interface DutyView {\n    readonly spec: DutySpec;\n    readonly state: DutyState;\n}',
+  },
+  {
     name: 'DynamicCordisPackage',
     declaration: 'export interface DynamicCordisPackage {\n    pluginId: CordisDynamicPluginId;\n    packageId: CordisDynamicPackageId;\n    pluginRunId: CordisDynamicPluginRunId;\n    name: string;\n}',
   },
@@ -3020,6 +3281,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'DynamicCordisRunRequest',
     declaration: 'export interface DynamicCordisRunRequest {\n    requestId: ApprovalRequestId;\n    agentId: SessionId;\n    pluginId: CordisDynamicPluginId;\n    packageId: CordisDynamicPackageId;\n    mode: CordisDynamicRunMode;\n    name: string;\n    purpose: string;\n    requiresApproval: boolean;\n}',
+  },
+  {
+    name: 'EditDutyRequest',
+    declaration: 'export interface EditDutyRequest {\n    readonly title?: string;\n    readonly goal?: string;\n    readonly scope?: string;\n    readonly trigger?: DutyTrigger;\n    readonly body?: DutyBody;\n    readonly toolPolicy?: DutyToolPolicy;\n    readonly limits?: Partial<DutyLimits>;\n    readonly escalation?: readonly string[];\n    readonly reporting?: string;\n    readonly projectId?: string;\n}',
   },
   {
     name: 'EditGoalRequest',
@@ -3130,6 +3395,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface GoalView extends GoalSnapshot {\n    readonly roundsStarted: number;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n    readonly activation: GoalActivation;\n}',
   },
   {
+    name: 'HumanRequest',
+    declaration: 'export interface HumanRequest {\n    readonly id: HumanRequestId;\n    readonly dutyId: DutyId;\n    readonly runId: DutyRunId;\n    readonly sessionId: SessionId;\n    readonly status: HumanRequestStatus;\n    readonly reason: HumanRequestReason;\n    readonly question: string;\n    readonly options: readonly string[];\n    readonly allowFreeform: boolean;\n    readonly createdAt: number;\n    readonly answeredAt?: number;\n    readonly answer?: string;\n}',
+  },
+  {
+    name: 'HumanRequestId',
+    declaration: 'export type HumanRequestId = Branded<\'HumanRequestId\'>;',
+  },
+  {
+    name: 'HumanRequestReason',
+    declaration: 'export type HumanRequestReason = \'missing_info\' | \'authorization\' | \'choice\' | \'blocked\';',
+  },
+  {
+    name: 'HumanRequestStatus',
+    declaration: 'export type HumanRequestStatus = \'open\' | \'answered\' | \'canceled\';',
+  },
+  {
     name: 'ImageAttachmentLimits',
     declaration: 'export interface ImageAttachmentLimits {\n    maxImageBytes: number;\n    maxImagesPerMessage: number;\n    maxMessageImageBytes: number;\n    maxImagePixels: number;\n    mediaTypes: readonly ImageMediaType[];\n}',
   },
@@ -3156,6 +3437,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'InboxTarget',
     declaration: 'export type InboxTarget = \'next-turn\' | \'next-step\';',
+  },
+  {
+    name: 'IntervalTrigger',
+    declaration: 'export interface IntervalTrigger {\n    readonly kind: \'interval\';\n    readonly description: string;\n    readonly everyMs: number;\n}',
   },
   {
     name: 'InvariantFailure',
@@ -3360,6 +3645,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ManualCompactAgentContext',
     declaration: 'export interface ManualCompactAgentContext extends CompactionAgentContext {\n    runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>;\n}',
+  },
+  {
+    name: 'ManualTrigger',
+    declaration: 'export interface ManualTrigger {\n    readonly kind: \'manual\';\n    readonly description: string;\n}',
   },
   {
     name: 'Message',

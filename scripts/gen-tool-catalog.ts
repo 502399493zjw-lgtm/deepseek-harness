@@ -51,6 +51,7 @@ import * as ToolStrReplaceEditor from '@deepseek-ai/dsh-tool-str-replace-editor'
 import TerminalSessionService from '@deepseek-ai/dsh-terminal'
 import * as ToolPty from '@deepseek-ai/dsh-tool-terminal'
 import * as ToolGoal from '@deepseek-ai/dsh-tool-goal'
+import * as ToolDuty from '@deepseek-ai/dsh-tool-duty'
 import * as ToolSchedule from '@deepseek-ai/dsh-schedule'
 import Lsp from '@deepseek-ai/dsh-lsp'
 import * as ToolLsp from '@deepseek-ai/dsh-tool-lsp'
@@ -340,6 +341,25 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'The six terminal tools are opt-in and complement one-shot shell/filesystem tools. `terminal_send(run_in_background: true)` registers with `ctx.jobs`; TUI, named key sequences, BEL, resize, auto-start, and cross-agent sharing are absent from the schema.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-duty',
+    dir: 'tool-duty',
+    source: 'packages/duty/tool-duty/src/index.ts',
+    requires: ['ctx.tools', 'ctx.duties'],
+    writes: ['tool/call', 'duty/change for contract mutations', 'tool/result'],
+    async mount(ctx) {
+      // A stand-in domain is enough: schema collection never executes tools,
+      // so the durable Duty service's storage stack stays out of the catalog.
+      ctx.provide('duties', {
+        list: () => [],
+        create: async () => ({}),
+        setLifecycle: async () => ({}),
+        answer: async () => ({}),
+      })
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(ToolDuty)
+    },
   },
   {
     pkg: '@deepseek-ai/dsh-tool-goal',

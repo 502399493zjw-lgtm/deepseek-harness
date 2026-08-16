@@ -567,6 +567,70 @@ export interface Config {
 
 Source: [`packages/credentials/credentials-local/src/index.ts:55`](../packages/credentials/credentials-local/src/index.ts)
 
+<a id="deepseek-aidsh-duty"></a>
+
+## `@deepseek-ai/dsh-duty`
+
+Requires: `storageDomain`
+
+```ts config-catalog
+/** Deployment policy for Duty defaults and audit retention. */
+export interface Config {
+  /** Consecutive failed runs tolerated before a Duty pauses itself. */
+  readonly defaultMaxConsecutiveFailures: number
+  /** Run records retained per Duty; older records are dropped newest-first. */
+  readonly runHistoryLimit: number
+  /** Trigger audit events retained per Duty. */
+  readonly triggerEventLimit: number
+}
+```
+
+Source: [`packages/duty/duty/src/index.ts:87`](../packages/duty/duty/src/index.ts)
+
+<a id="deepseek-aidsh-duty-runner"></a>
+
+## `@deepseek-ai/dsh-duty-runner`
+
+Requires: `duties` · `agents` · `sessions` · `subagents` · `sessionPersistence`
+
+```ts config-catalog
+/** Deployment policy for run driving, pricing, and repair. */
+export interface Config {
+  /** Subagent provider used for `parallel` fan-out. */
+  readonly subagentProvider: string
+  /**
+   * Blended USD price per million tokens used to attribute cost to a run;
+   * zero disables cost accounting (a Duty with a budget then never pauses on
+   * it).
+   */
+  readonly tokenPriceUsdPerMillion: number
+  /** Repairs per agent step after the first attempt, 0–5. */
+  readonly maxRepairs: number
+}
+```
+
+Source: [`packages/duty/duty-runner/src/index.ts:53`](../packages/duty/duty-runner/src/index.ts)
+
+<a id="deepseek-aidsh-duty-trigger"></a>
+
+## `@deepseek-ai/dsh-duty-trigger`
+
+```ts config-catalog
+/**
+ * Registry cadence policy. The upper bound keeps the sweep strictly below one
+ * minute so a calendar trigger matching a whole minute can never be skipped
+ * between two sweeps.
+ */
+export interface Config {
+  /**
+   * Milliseconds between sweep starts, a whole millisecond from 1000 to 60000.
+   */
+  readonly pollIntervalMs: number
+}
+```
+
+Source: [`packages/duty/duty-trigger/src/index.ts:42`](../packages/duty/duty-trigger/src/index.ts)
+
 <a id="deepseek-aidsh-e2b"></a>
 
 ## `@deepseek-ai/dsh-e2b`
@@ -3061,10 +3125,12 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-workflow-run` ([`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-workspace` ([`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts))
 - `@deepseek-ai/dsh-command-compact` — requires `commands` · `compaction` ([`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts))
+- `@deepseek-ai/dsh-command-duty` — requires `commands` · `duties` ([`packages/duty/command-duty/src/index.ts`](../packages/duty/command-duty/src/index.ts))
 - `@deepseek-ai/dsh-command-feedback` — requires `commands` ([`packages/feedback/command-feedback/src/index.ts`](../packages/feedback/command-feedback/src/index.ts))
 - `@deepseek-ai/dsh-command-goal` — requires `commands` · `goals` ([`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts))
 - `@deepseek-ai/dsh-commands` ([`packages/interaction/commands/src/index.ts`](../packages/interaction/commands/src/index.ts))
 - `@deepseek-ai/dsh-cordis-client-runner` ([`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts))
+- `@deepseek-ai/dsh-duty-trigger-timer` — requires `dutyTriggers` · `duties` ([`packages/duty/duty-trigger-timer/src/index.ts`](../packages/duty/duty-trigger-timer/src/index.ts))
 - `@deepseek-ai/dsh-fs-e2b` — requires `e2b` ([`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts))
 - `@deepseek-ai/dsh-fs-observation-policy` ([`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts))
 - `@deepseek-ai/dsh-goal-round-driver` — requires `agents` · `goals` · `sessions` ([`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts))
@@ -3087,6 +3153,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))
 - `@deepseek-ai/dsh-tool-call-timeout-policy` — requires `tools` ([`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts))
 - `@deepseek-ai/dsh-tool-cordis` — requires `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))
+- `@deepseek-ai/dsh-tool-duty` — requires `tools` · `duties` ([`packages/duty/tool-duty/src/index.ts`](../packages/duty/tool-duty/src/index.ts))
 - `@deepseek-ai/dsh-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
 - `@deepseek-ai/dsh-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))
 - `@deepseek-ai/dsh-workspace` — requires `storageDomain` · `sessionPersistence` ([`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts))

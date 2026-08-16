@@ -241,6 +241,7 @@
         "./packages/context/*/src",
         "./packages/goal/*/src",
         "./packages/feedback/*/src",
+        "./packages/duty/*/src",
         "./packages/schedule/*/src",
         "./packages/guard/*/src",
         "./packages/plan/*/src",

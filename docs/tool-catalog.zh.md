@@ -28,6 +28,7 @@
 | `@deepseek-ai/dsh-tool-fs` | `edit`、`read`、`read_image`、`write` | `ctx.tools`、`ctx.fs`、`ctx.systemPrompt`、`ctx.attachments (read_image registration)`、`ctx.llm + an image-capable route (read_image execution)` | `tool/call`、`fs/write-intent or fs/edit-intent for mutations`、`fs/observed after read presence/absence or successful file operation`、`durable attachment (read_image)`、`tool/result` | - | 先读后写／编辑策略由 `@deepseek-ai/dsh-fs-observation-policy` 添加；它是一个 `fs/*` 事件门禁插件，不会改变 schema。加载这些工具的部署按预期也应加载该插件。没有 `ctx.attachments` 时 `read_image` 不会注册；其 schema 与路由无关，执行时除非确切路由的模型声明图像输入，否则拒绝。 |
 | `@deepseek-ai/dsh-tool-fs-search` | `glob`、`grep` | `ctx.tools`、`ctx.subprocess`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | glob 和 grep 是无条件可用的发现工具，通过 ctx.subprocess spawn 随包提供的 ripgrep 二进制文件（`@vscode/ripgrep`），并作为普通前台调用运行，绝不作为后台任务；无需在宿主机安装 `rg`，也不经过 shell 层。本目录使用 `sampleOverCapGlobResults: true`；部署必须显式选择该行为。结果超过上限时，会通过可选的 ctx.spillStore 后端保存完整的格式化列表；在共置部署中，如果后端公开本地路径，返回的定位信息可供后续读取／搜索。 |
 | `@deepseek-ai/dsh-tool-terminal` | `terminal_close`、`terminal_list`、`terminal_open`、`terminal_read`、`terminal_send`、`terminal_signal` | `ctx.tools`、`ctx.terminals`、`ctx.systemPrompt`、`ctx.jobs at call time for run_in_background` | `tool/call`、`tool/result` | - | 这 6 个终端工具需要选择启用，用于补充一次性 bash／文件系统工具。`terminal_send(run_in_background: true)` 会注册到 `ctx.jobs`；schema 不包含 TUI、具名按键序列、BEL、调整尺寸、自动启动和跨 agent 共享。 |
+| `@deepseek-ai/dsh-tool-duty` | `duty_answer`、`duty_create`、`duty_list`、`duty_set_lifecycle`、`duty_start` | `ctx.tools`、`ctx.duties` | `tool/call`、`duty/change for contract mutations`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`、`get_goal`、`update_goal` | `ctx.tools`、`ctx.agents`、`ctx.goals`、`ctx.systemPrompt`、`a calling Agent in an authorized open turn` | `tool/call`、`goal/change for mutations`、`tool/result` | - | create、edit、pause 和 resume 要求直接来自人类的根权限；complete 和 blocked 也接受确切的当前 Goal Round。blocked 的默认下限是 3 个获准的 Round。 |
 | `@deepseek-ai/dsh-schedule` | `schedule_create`、`schedule_delete`、`schedule_list` | `ctx.tools`、`ctx.sessions`、Session 持久化、未来创建的 live 根 Agent | `tool/call`、`schedule/change create or delete`、`tool/result` | - | 仅在选择启用的 Schedule 插件加载后创建的 live 根 Agent scope 内注册。版本 1 接受 after_seconds、显式绝对 at 和有界固定速率 every_seconds，并披露 session-local 交付；管理读取与变更必须通过共享的 Session 持久化 barrier。 |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`、`ctx.lsp`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。 |
@@ -941,6 +942,170 @@ glob 和 grep 是无条件可用的发现工具，通过 ctx.subprocess spawn �
 来源：[`packages/terminal/tool-terminal/src/index.ts`](../packages/terminal/tool-terminal/src/index.ts)
 
 这 6 个终端工具需要选择启用，用于补充一次性 bash／文件系统工具。`terminal_send(run_in_background: true)` 会注册到 `ctx.jobs`；schema 不包含 TUI、具名按键序列、BEL、调整尺寸、自动启动和跨 agent 共享。
+
+<a id="deepseek-aidsh-tool-duty"></a>
+
+## `@deepseek-ai/dsh-tool-duty`
+
+### `duty_answer`
+
+Answer one open human decision, unblocking its parked run. The answer must be one of the offered options unless the request allows free-form input.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "duty_id": {
+      "type": "string",
+      "description": "The Duty id."
+    },
+    "request_id": {
+      "type": "string",
+      "description": "The open request id."
+    },
+    "answer": {
+      "type": "string",
+      "description": "The human's verbatim answer."
+    }
+  },
+  "required": [
+    "duty_id",
+    "request_id",
+    "answer"
+  ]
+}
+```
+
+Source: [`packages/duty/tool-duty/src/index.ts`](../packages/duty/tool-duty/src/index.ts)
+
+### `duty_create`
+
+Create one Duty in draft from a complete contract: title, goal, trigger, execution body, tool policy, and optional limits. The Host validates the contract; a draft never wakes until duty_set_lifecycle activates it.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Short human-facing name."
+    },
+    "goal": {
+      "type": "string",
+      "description": "Intended outcome in the user's own terms."
+    },
+    "scope": {
+      "type": "string",
+      "description": "What the Duty must not do."
+    },
+    "trigger": {
+      "description": "kind manual | interval (everyMs >= 60000) | cron (five numeric fields), plus a description."
+    },
+    "body": {
+      "description": "Execution body: steps of kind agent (prompt required), parallel, or phase with children."
+    },
+    "tool_policy": {
+      "description": "{ allow: [tool names], gated: [subset of allow] }."
+    },
+    "limits": {
+      "description": "{ maxConsecutiveFailures?: 1-20, budgetUsd?: <= 20 }."
+    },
+    "escalation": {
+      "type": "array",
+      "description": "Conditions under which the Duty asks a human.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reporting": {
+      "type": "string",
+      "description": "Where and how results are reported."
+    },
+    "project_id": {
+      "type": "string",
+      "description": "Optional owning project grouping."
+    }
+  },
+  "required": [
+    "title",
+    "goal",
+    "trigger",
+    "body",
+    "tool_policy"
+  ]
+}
+```
+
+Source: [`packages/duty/tool-duty/src/index.ts`](../packages/duty/tool-duty/src/index.ts)
+
+### `duty_list`
+
+List every Duty with its current lifecycle, run count, and most recent outcome. Use it to see what responsibilities exist before creating or editing one.
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+Source: [`packages/duty/tool-duty/src/index.ts`](../packages/duty/tool-duty/src/index.ts)
+
+### `duty_set_lifecycle`
+
+Move one Duty between draft, active, paused, and archived. Pausing requires a reason (failures, budget, escalation, or human). Only an active Duty can wake.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "duty_id": {
+      "type": "string",
+      "description": "The Duty id."
+    },
+    "lifecycle": {
+      "type": "string",
+      "description": "draft | active | paused | archived."
+    },
+    "paused_reason": {
+      "type": "string",
+      "description": "Required when lifecycle is paused: failures, budget, escalation, or human."
+    }
+  },
+  "required": [
+    "duty_id",
+    "lifecycle"
+  ]
+}
+```
+
+Source: [`packages/duty/tool-duty/src/index.ts`](../packages/duty/tool-duty/src/index.ts)
+
+### `duty_start`
+
+Wake one active Duty now by hand. The run executes the stored body in its own Session; this returns the run record once the run is admitted.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "duty_id": {
+      "type": "string",
+      "description": "The Duty id."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Why this wake is requested."
+    }
+  },
+  "required": [
+    "duty_id",
+    "reason"
+  ]
+}
+```
+
+Source: [`packages/duty/tool-duty/src/index.ts`](../packages/duty/tool-duty/src/index.ts)
 
 <a id="deepseek-aidsh-tool-goal"></a>
 

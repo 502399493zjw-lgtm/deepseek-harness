@@ -97,6 +97,32 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'duties',
+    pkg: 'duty',
+    title: 'Durable responsibility domain',
+    mode: 'core',
+    consumers: ['duty-runner', 'tool-duty', 'command-duty'],
+    note: 'Owns duty contracts, operational state, run records, human decisions, and the single-run claim in the duty storage domain.',
+  },
+  {
+    key: 'dutyTriggers',
+    pkg: 'duty-trigger',
+    title: 'Duty waking-source registry',
+    mode: 'seam',
+    implementations: ['duty-trigger-timer'],
+    consumers: ['duty-runner'],
+    note: 'Sweeps registered providers on a sub-minute cadence and publishes due observations as duty/trigger events.',
+  },
+  {
+    key: 'dutyRunner',
+    pkg: 'duty-runner',
+    title: 'Major-trigger run runtime',
+    mode: 'core',
+    consumers: ['tool-duty', 'command-duty'],
+    note: 'Claims runs, drives execution bodies as agent turns and subagent fan-out, and parks on durable human decisions.',
+  },
+
+  {
     key: 'attachments',
     pkg: 'attachment',
     title: 'Durable binary attachment storage',

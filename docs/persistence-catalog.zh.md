@@ -391,6 +391,96 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 来源：[`packages/compaction/compaction/src/types.ts:33`](../packages/compaction/compaction/src/types.ts)
 
+### `duty/*`
+
+<a id="dutyhuman-answer--log-only"></a>
+
+#### `duty/human-answer` — log-only
+
+```ts persistence-catalog
+/**
+ * A human answered the request this run parked on; the fold clears the
+ * wait and the next instruction names the answer.
+ */
+'duty/human-answer': {
+  readonly requestId: string
+  readonly answer: string
+}
+```
+
+Source: [`packages/duty/duty-runner/src/session-events.ts:52`](../packages/duty/duty-runner/src/session-events.ts)
+
+<a id="dutyhuman-wait--log-only"></a>
+
+#### `duty/human-wait` — log-only
+
+```ts persistence-catalog
+/**
+ * The run parked on a durable human request. The subsequent
+ * `duty/human-answer` event clears it.
+ */
+'duty/human-wait': {
+  readonly requestId: string
+  readonly question: string
+}
+```
+
+Source: [`packages/duty/duty-runner/src/session-events.ts:44`](../packages/duty/duty-runner/src/session-events.ts)
+
+<a id="dutyrun-bound--log-only"></a>
+
+#### `duty/run-bound` — log-only
+
+```ts persistence-catalog
+/**
+ * This Session belongs to one major-trigger run, appended before the
+ * kickoff message so a cold fold can always recover the run identity.
+ */
+'duty/run-bound': {
+  readonly dutyId: DutyId
+  readonly runId: string
+  readonly cause: DutyRunCause
+}
+```
+
+Source: [`packages/duty/duty-runner/src/session-events.ts:24`](../packages/duty/duty-runner/src/session-events.ts)
+
+<a id="dutyrun-finish--log-only"></a>
+
+#### `duty/run-finish` — log-only
+
+```ts persistence-catalog
+/**
+ * The run reached its terminal outcome; the fold treats it as the end.
+ */
+'duty/run-finish': {
+  readonly status: DutyRunStatus
+  readonly summary?: string
+}
+```
+
+Source: [`packages/duty/duty-runner/src/session-events.ts:59`](../packages/duty/duty-runner/src/session-events.ts)
+
+<a id="dutystep--log-only"></a>
+
+#### `duty/step` — log-only
+
+```ts persistence-catalog
+/**
+ * One step entered a new attempt. Duplicates the same step's earlier
+ * records; the fold keeps the newest.
+ */
+'duty/step': {
+  readonly stepId: string
+  readonly label: string
+  readonly status: 'started' | 'completed' | 'failed'
+  readonly attempts: number
+  readonly summary?: string
+}
+```
+
+Source: [`packages/duty/duty-runner/src/session-events.ts:33`](../packages/duty/duty-runner/src/session-events.ts)
+
 ### `feedback/*`
 
 <a id="feedbackrecord--log-only"></a>
