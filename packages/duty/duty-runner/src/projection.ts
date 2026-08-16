@@ -32,6 +32,7 @@ export const dutyRunProjectionSchema = z.object({
       pass: z.boolean(),
       reason: z.string().optional(),
     }).optional(),
+    appeal: z.union([z.literal('asked'), z.literal('accepted'), z.literal('repair')]).optional(),
   })),
   waitingHuman: z.object({
     requestId: z.string().min(1),
@@ -126,6 +127,27 @@ export function applyDutyRunProjection(
       }
       const steps = base.steps.map((step, at) => at === index
         ? { ...step, lastVerdict: verdict }
+        : step)
+      return { ...base, steps }
+    }
+    case 'duty/verdict-appeal': {
+      const base = state ?? { steps: [] }
+      const { data } = event
+      const index = base.steps.findIndex(step => step.stepId === data.stepId)
+      if (index === -1) {
+        return {
+          ...base,
+          steps: [...base.steps, {
+            stepId: data.stepId,
+            label: data.stepId,
+            status: 'started',
+            attempts: 1,
+            appeal: data.status,
+          }],
+        }
+      }
+      const steps = base.steps.map((step, at) => at === index
+        ? { ...step, appeal: data.status }
         : step)
       return { ...base, steps }
     }

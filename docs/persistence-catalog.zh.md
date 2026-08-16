@@ -488,7 +488,8 @@ Source: [`packages/duty/duty-runner/src/session-events.ts:33`](../packages/duty/
 ```ts persistence-catalog
 /**
  * One independent verification verdict for a step that reported
- * completion. A failed verdict precedes a repair attempt.
+ * completion. A failed verdict precedes a repair attempt or a human
+ * appeal.
  */
 'duty/verdict': {
   readonly stepId: string
@@ -497,7 +498,25 @@ Source: [`packages/duty/duty-runner/src/session-events.ts:33`](../packages/duty/
 }
 ```
 
-Source: [`packages/duty/duty-runner/src/session-events.ts:67`](../packages/duty/duty-runner/src/session-events.ts)
+Source: [`packages/duty/duty-runner/src/session-events.ts:68`](../packages/duty/duty-runner/src/session-events.ts)
+
+<a id="dutyverdict-appeal--log-only"></a>
+
+#### `duty/verdict-appeal` — log-only
+
+```ts persistence-catalog
+/**
+ * One human appeal decision over a failed verdict: asked, then accepted
+ * (the step completes anyway) or repair (the next attempt runs). The fold
+ * keeps the latest status per step.
+ */
+'duty/verdict-appeal': {
+  readonly stepId: string
+  readonly status: 'asked' | 'accepted' | 'repair'
+}
+```
+
+Source: [`packages/duty/duty-runner/src/session-events.ts:78`](../packages/duty/duty-runner/src/session-events.ts)
 
 ### `feedback/*`
 

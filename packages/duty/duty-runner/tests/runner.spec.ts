@@ -383,12 +383,18 @@ describe('duty run runtime', () => {
       expect((verdict?.data as { pass: boolean }).pass).toBe(true)
     })
 
-    it('sends a failed verdict back through repair, then passes', async () => {
+    it('parks a failed verdict and repairs when the human says repair', async () => {
       const { dutyId, stepId } = await activeDuty({ verification: 'on' })
       verifySequence([{ pass: false, reason: 'no proof' }, { pass: true }])
       harness.scripts.add(completeStepScript(stepId))
 
       trigger(dutyId)
+
+      await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'waiting_for_human')
+      const open = harness.duty.duties.openRequests()[0]
+      if (open === undefined) throw new Error('expected an appeal request')
+      expect(open.options).toEqual(['accept', 'repair'])
+      await harness.duty.duties.answer(DutyId(dutyId), open.id, 'repair')
 
       await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'succeeded')
       const view = harness.duty.duties.get(DutyId(dutyId))
@@ -398,12 +404,39 @@ describe('duty run runtime', () => {
       expect(view?.state.cursor).toEqual({ lastStepId: stepId })
     })
 
-    it('fails the run when every verdict fails', async () => {
+    it('accepts a failed verdict and completes the step anyway', async () => {
+      const { dutyId } = await activeDuty({ verification: 'on' })
+      verifySequence([{ pass: false, reason: 'no proof' }])
+      harness.scripts.add(completeStepScript('collect', 'triaged'))
+
+      trigger(dutyId)
+
+      await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'waiting_for_human')
+      const open = harness.duty.duties.openRequests()[0]
+      if (open === undefined) throw new Error('expected an appeal request')
+      await harness.duty.duties.answer(DutyId(dutyId), open.id, 'accept')
+
+      await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'succeeded')
+      const [run] = harness.duty.duties.runsOf(DutyId(dutyId))
+      expect(run?.summary).toBe('triaged')
+      const completed = [...harness.sessions.values()].flatMap(session =>
+        session.events.filter((event: SessionEvent) => event.type === 'duty/step' && (event.data as { status: string }).status === 'completed'))
+      expect(completed[0]?.data).toMatchObject({ attempts: 1 })
+    })
+
+    it('fails the run when every appeal answers repair', async () => {
       const { dutyId } = await activeDuty({ verification: 'on' })
       verifySequence([{ pass: false, reason: 'no proof' }])
       harness.scripts.add(completeStepScript('collect'))
 
       trigger(dutyId)
+
+      for (let round = 1; round <= 3; round += 1) {
+        await harness.waitFor(() => harness.duty.duties.openRequests().length === 1)
+        const open = harness.duty.duties.openRequests()[0]
+        if (open === undefined) throw new Error('expected an appeal request')
+        await harness.duty.duties.answer(DutyId(dutyId), open.id, 'repair')
+      }
 
       await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'failed')
       const view = harness.duty.duties.get(DutyId(dutyId))

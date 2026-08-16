@@ -562,6 +562,34 @@ export class DutyRunnerService extends Service {
   }
 
   /**
+   * Park the run on a failed verdict with the accept/repair choice. The
+   * durable request carries the options; the appeal event records the ask.
+   * @param agent - the live run Agent.
+   * @param local - the run's working set.
+   * @param step - the step whose verdict failed.
+   * @param reason - why the verifier rejected the completion.
+   */
+  private async askAppeal(
+    agent: Agent,
+    local: RunLocal,
+    step: DutyStep,
+    reason: string,
+  ): Promise<void> {
+    agent.session.append('duty/verdict-appeal', { stepId: step.id, status: 'asked' })
+    const request = await this.ctx.duties.ask({
+      dutyId: local.run.dutyId,
+      runId: local.run.id,
+      sessionId: local.run.sessionId,
+      reason: 'choice',
+      question: `步骤「${step.label}」验证未通过:${reason}。接受该步骤,还是继续修复?`,
+      options: ['accept', 'repair'],
+      allowFreeform: false,
+    })
+    local.parkedRequestId = request.id
+    local.session?.append('duty/human-wait', { requestId: request.id, question: request.question })
+  }
+
+  /**
    * Judge one reported step completion. Duties with `verification: 'on'`
    * consult the configured verifier over the step's evidence window; a missing
    * verifier fails loud, and every verdict is recorded as `duty/verdict`.
@@ -603,16 +631,16 @@ export class DutyRunnerService extends Service {
 
   /** Execute one step: agent turns with repair, phase recursion, or fan-out. */
   private async executeStep(agent: Agent, local: RunLocal, step: DutyStep): Promise<void> {
+    if (step.kind === 'agent') {
+      await this.executeAgentStep(agent, local, step)
+      return
+    }
     agent.session.append('duty/step', {
       stepId: step.id,
       label: step.label,
       status: 'started',
       attempts: 1,
     })
-    if (step.kind === 'agent') {
-      await this.executeAgentStep(agent, local, step)
-      return
-    }
     if (step.kind === 'parallel') {
       await this.executeParallelStep(agent, local, step)
       return
@@ -631,16 +659,42 @@ export class DutyRunnerService extends Service {
 
   /** One agent step with its repair loop over the completion-marking contract. */
   private async executeAgentStep(agent: Agent, local: RunLocal, step: DutyStep): Promise<void> {
+    // A human accepted this step after a failed verdict: complete it without
+    // another instruction. The summary is the model's own report when this
+    // process still holds it; a cold resume records the acceptance instead.
+    const foldedBefore = foldRunMachine(agent.session.events)
+    const recordBefore = foldedBefore.steps.find(record => record.stepId === step.id)
+    if (recordBefore?.appeal === 'accepted') {
+      agent.session.append('duty/step', {
+        stepId: step.id,
+        label: step.label,
+        status: 'completed',
+        attempts: recordBefore.attempts,
+        summary: local.summaries.get(step.id) ?? 'human accepted the step after a failed verdict',
+      })
+      return
+    }
+    // Attempt numbering continues from the fold, so a repaired step counts
+    // its total attempts against the same cap as a fresh one.
+    const attemptsSoFar = recordBefore?.attempts ?? 0
     const maxAttempts = this.policy.maxRepairs + 1
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      if (attempt > 1) {
-        agent.session.append('duty/step', {
-          stepId: step.id,
-          label: step.label,
-          status: 'started',
-          attempts: attempt,
-        })
-      }
+    if (attemptsSoFar >= maxAttempts) {
+      agent.session.append('duty/step', {
+        stepId: step.id,
+        label: step.label,
+        status: 'failed',
+        attempts: maxAttempts,
+      })
+      local.failures.push(`step '${step.id}' (${step.label}) did not complete after ${maxAttempts} attempts`)
+      return
+    }
+    for (let attempt = attemptsSoFar + 1; attempt <= maxAttempts; attempt += 1) {
+      agent.session.append('duty/step', {
+        stepId: step.id,
+        label: step.label,
+        status: 'started',
+        attempts: attempt,
+      })
       const instruction = createUserMessage({
         content: [{ type: 'text', text: renderStepInstruction(step, attempt) }],
         source: { kind: 'duty' },
@@ -661,8 +715,11 @@ export class DutyRunnerService extends Service {
           })
           return
         }
-        // A failed verdict falls through to the next repair attempt; the
-        // verdict itself is already recorded in the session log.
+        // A failed verdict parks for a human appeal: accept completes the
+        // step anyway, repair runs the next attempt. The verdict itself is
+        // already recorded in the session log.
+        await this.askAppeal(agent, local, step, verdict.reason ?? 'verification failed')
+        return
       }
     }
     agent.session.append('duty/step', {
@@ -804,6 +861,16 @@ export class DutyRunnerService extends Service {
         requestId: request.id,
         answer: request.answer ?? '',
       })
+      // An appeal answer closes the asked appeal with its decision, so the
+      // resumed machine either completes the step or repairs it.
+      const asked = foldRunMachine(handle.agent.session.events).steps
+        .find(record => record.appeal === 'asked')
+      if (asked !== undefined) {
+        handle.agent.session.append('duty/verdict-appeal', {
+          stepId: asked.stepId,
+          status: request.answer === 'accept' ? 'accepted' : 'repair',
+        })
+      }
       const resume = createUserMessage({
         content: [{ type: 'text', text: renderResume(request.answer ?? '') }],
         source: { kind: 'duty' },

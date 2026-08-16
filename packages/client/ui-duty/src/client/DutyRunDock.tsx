@@ -80,6 +80,9 @@ export function DutyRunDock({ useProjection, answer, t }: DutyRunDockProps) {
                   {step.lastVerdict.reason === undefined ? '' : ` — ${step.lastVerdict.reason}`}
                 </span>
               )}
+              {step.appeal === 'accepted' && (
+                <span className={css.verdictPass}>· {t('run.appeal.accepted')}</span>
+              )}
             </li>
           ))}
         </ol>

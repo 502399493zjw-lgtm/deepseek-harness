@@ -32,6 +32,8 @@ export interface DutyStepRecord {
     readonly pass: boolean
     readonly reason?: string
   }
+  /** The latest human appeal decision for this step; absent without one. */
+  readonly appeal?: 'asked' | 'accepted' | 'repair'
 }
 
 /** A durable request the run parked on, still awaiting an answer. */

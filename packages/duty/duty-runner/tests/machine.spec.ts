@@ -60,6 +60,15 @@ describe('run machine fold', () => {
     expect(state.steps[0]).toMatchObject({ stepId: 'b', lastVerdict: { pass: false, reason: 'no proof' } })
   })
 
+  it('keeps the latest appeal status per step', () => {
+    const state = foldRunMachine([
+      event('duty/verdict-appeal', { stepId: 'a', status: 'asked' }, 1),
+      event('duty/verdict-appeal', { stepId: 'a', status: 'repair' }, 2),
+      event('duty/verdict-appeal', { stepId: 'a', status: 'accepted' }, 3),
+    ])
+    expect(state.steps[0]?.appeal).toBe('accepted')
+  })
+
   it('records the terminal outcome', () => {
     const state = foldRunMachine([
       event('duty/run-finish', { status: 'succeeded', summary: 'done' }, 1),

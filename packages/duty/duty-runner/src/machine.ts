@@ -74,6 +74,24 @@ export function foldRunMachine(events: readonly SessionEvent[]): DutyRunMachineS
         }
         break
       }
+      case 'duty/verdict-appeal': {
+        const { data } = event
+        const record: DutyStepRecord = {
+          stepId: data.stepId,
+          label: data.stepId,
+          status: 'started',
+          attempts: 1,
+          appeal: data.status,
+        }
+        const existing = steps.get(data.stepId)
+        if (existing === undefined) {
+          steps.set(data.stepId, record)
+          ordered.push(record)
+        } else {
+          Object.assign(existing, { appeal: data.status })
+        }
+        break
+      }
       case 'duty/run-finish': {
         // A waiting_for_human finish event is a park marker, not a terminal
         // outcome: the same Session resumes once the human answers.

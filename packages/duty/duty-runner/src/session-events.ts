@@ -62,12 +62,22 @@ declare module '@deepseek-ai/dsh-session/types' {
     }
     /**
      * One independent verification verdict for a step that reported
-     * completion. A failed verdict precedes a repair attempt.
+     * completion. A failed verdict precedes a repair attempt or a human
+     * appeal.
      */
     'duty/verdict': {
       readonly stepId: string
       readonly pass: boolean
       readonly reason?: string
+    }
+    /**
+     * One human appeal decision over a failed verdict: asked, then accepted
+     * (the step completes anyway) or repair (the next attempt runs). The fold
+     * keeps the latest status per step.
+     */
+    'duty/verdict-appeal': {
+      readonly stepId: string
+      readonly status: 'asked' | 'accepted' | 'repair'
     }
   }
 }

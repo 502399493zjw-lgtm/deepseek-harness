@@ -99,10 +99,21 @@ describe('duty run projection', () => {
     expect(created?.steps[0]).toMatchObject({ stepId: 'x', lastVerdict: { pass: true } })
   })
 
+  it('folds an appeal decision onto its step', () => {
+    let state: DutyRunMachineState | undefined
+    state = applyDutyRunProjection(state, event('duty/verdict-appeal', {
+      stepId: 'a', status: 'asked',
+    }, 1))
+    state = applyDutyRunProjection(state, event('duty/verdict-appeal', {
+      stepId: 'a', status: 'accepted',
+    }, 2))
+    expect(state?.steps[0]?.appeal).toBe('accepted')
+  })
+
   it('validates a complete machine state against the wire schema', () => {
     const state: DutyRunMachineState = {
       bound: { dutyId: DutyId('d1'), runId: 'r1', cause: { kind: 'schedule', reason: 'hourly' } },
-      steps: [{ stepId: 'a', label: 'Collect', status: 'completed', attempts: 1, summary: 'ok', lastVerdict: { pass: true } }],
+      steps: [{ stepId: 'a', label: 'Collect', status: 'completed', attempts: 1, summary: 'ok', lastVerdict: { pass: true }, appeal: 'accepted' }],
       waitingHuman: { requestId: 'h1', question: 'Send?' },
       finished: { status: 'failed', summary: 'budget exceeded' },
     }

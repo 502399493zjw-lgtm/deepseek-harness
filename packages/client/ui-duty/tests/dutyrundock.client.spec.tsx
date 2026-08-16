@@ -69,6 +69,20 @@ describe('DutyRunDock', () => {
     expect(screen.getByText('验收通过')).toBeTruthy()
   })
 
+  it('renders an accepted appeal marker', () => {
+    const actions = makeActions()
+    render(<DutyRunDock
+      {...({
+        useProjection: () => makeState({
+          steps: [{ stepId: 'a', label: 'Collect', status: 'completed', attempts: 1, lastVerdict: { pass: false, reason: 'no proof' }, appeal: 'accepted' }],
+        }),
+        ...actions,
+        t,
+      } as unknown as DutyRunDockProps)}
+    />)
+    expect(screen.getByText(/已人工接受/)).toBeTruthy()
+  })
+
   it('renders a failed verdict with its reason', () => {
     const actions = makeActions()
     render(<DutyRunDock
