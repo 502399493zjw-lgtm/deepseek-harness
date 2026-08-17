@@ -11,7 +11,7 @@ The run's Session log is the machine's only authority. Every state change is a s
 | key | meaning |
 |---|---|
 | `subagentProvider` | Subagent provider used for `parallel` fan-out; defaults to `fork`. |
-| `tokenPriceUsdPerMillion` | Required blended USD price per million tokens for run cost attribution; `0` disables cost accounting. |
+| `tokenPrices` | Required map: USD price per million tokens keyed by provider route; an unconfigured provider fails the run loudly, `0` disables accounting for that route. |
 | `maxRepairs` | Repairs per agent step after the first attempt, 0–5; defaults to 2. |
 
 ```yaml
@@ -19,7 +19,8 @@ The run's Session log is the machine's only authority. Every state change is a s
   name: '@deepseek-ai/dsh-duty-runner'
   config:
     subagentProvider: fork
-    tokenPriceUsdPerMillion: 2.0
+    tokenPrices:
+      deepseek-official: 2.0
     maxRepairs: 2
 ```
 
@@ -33,7 +34,7 @@ The service injects `duties`, `agents`, `sessions`, `subagents`, and `sessionPer
 4. **Body.** `agent` steps run as turns on the run's Agent; `phase` steps recurse in order; `parallel` steps fan their children out through the subagent seam and complete only when every child stops with `completed`.
 5. **Verify.** With `verification: 'on'`, a reported step completion goes through the configured `ctx.dutyVerifiers` checker over the step's evidence window; each verdict is recorded as `duty/verdict`, a missing verifier fails the run loudly, and a failed verdict parks the run on a durable accept/repair choice (`duty/verdict-appeal`): accepting completes the step anyway, repairing runs the next attempt against the same cap.
 6. **Park and resume.** `duty_request_human` creates a durable {@link HumanRequest}, appends `duty/human-wait`, and settles the run as `waiting_for_human` with the claim held. When the answer commits, `dsh-duty` emits `duty/human-answered`; the runner resumes the same Session, appends `duty/human-answer`, and continues from the fold. A parked run survives a process restart: boot reconciliation re-arms it and cold-resumes interrupted runs by refolding their persisted logs.
-6. **Settle.** The cursor advances only on success. Run cost is the sum of the Session's `assistant/message` usage priced by `tokenPriceUsdPerMillion`; exceeding `limits.budgetUsd` fails the run and pauses the Duty on `budget` regardless of the failure count. Consecutive failures pause on `failures` per `limits.maxConsecutiveFailures`.
+6. **Settle.** The cursor advances only on success. Run cost is the sum of the Session's `assistant/message` usage priced by the per-provider `tokenPrices` map; exceeding `limits.budgetUsd` fails the run and pauses the Duty on `budget` regardless of the failure count. Consecutive failures pause on `failures` per `limits.maxConsecutiveFailures`.
 
 ## Model Experience
 
@@ -56,5 +57,5 @@ Append-only within the run's Session: each attempt extends the conversation afte
 - **Verification is opt-in** — a Duty with `verification: 'off'` (the default) accepts the model's own `duty_step_done` report; `'on'` consults the `ctx.dutyVerifiers` seam, whose evaluator provider judges the evidence window, and a failed verdict repairs the step.
 - **No cross-process single-run guarantee** — the claim serializes through one Host process's domain write chain; two Host processes running the runner both poll and one loses the claim race by a skip record.
 - **Adaptation is model-authored** — `duty_adapt_body` validates the adapted body against the durable schema, but no diff review against the stored body is enforced before execution.
-- **Budget pricing is a single blended rate** — per-provider or per-model pricing is deferred; runs attribute cost under one configured USD-per-million-token price.
+- **Per-provider, not per-model pricing** — the map prices provider routes; model-level rates are deferred.
 - **Teardown parks rather than settles** — unloading the runner disposes live run Agents without settling; the next boot's reconciliation cold-resumes or fails them.

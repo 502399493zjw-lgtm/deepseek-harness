@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/duty/duty-runner/README.md
-README.md: f7006fcb77fddb1153b54d0a24820b379a477179
-README.zh.md: ea92f7f9e925ae4e6f4fa3f2fe563cb9c2921b91
+README.md: 3f065411e854fe56a1b9b689b8b6cfc90f7f98ac
+README.zh.md: 5eb3ba264d7f96a528ede524cbb9631e51a27eed

@@ -41,7 +41,8 @@
             name: '@deepseek-ai/dsh-duty-runner'
             config:
               subagentProvider: fork
-              tokenPriceUsdPerMillion: 1
+              tokenPrices:
+                deepseek-official: 1
               maxRepairs: 2
           - id: duty-verify
             name: '@deepseek-ai/dsh-duty-verify'

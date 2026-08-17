@@ -133,7 +133,7 @@ async function createRunnerHarness(options: { withVerifiers?: boolean } = {}): P
 
   await duty.ctx.plugin(DutyRunnerService, {
     subagentProvider: 'fake',
-    tokenPriceUsdPerMillion: 1,
+    tokenPrices: { 'deepseek-official': 1 },
     maxRepairs: 2,
   })
 
@@ -313,7 +313,7 @@ describe('duty run runtime', () => {
           type: 'assistant/message',
           seq: 100,
           time: Date.now(),
-          data: { message: {}, usage: { inputTokens: 5, outputTokens: 5 } },
+          data: { message: { source: { kind: 'model', provider: 'deepseek-official' } }, usage: { inputTokens: 5, outputTokens: 5 } },
         } as unknown as SessionEvent)
       }
     })
@@ -455,6 +455,27 @@ describe('duty run runtime', () => {
       const [run] = harness.duty.duties.runsOf(DutyId(dutyId))
       expect(run?.summary).toContain('no duty verifier registry is loaded')
     })
+  })
+
+  it('fails loud when usage names a provider without a configured price', async () => {
+    const { dutyId, stepId } = await activeDuty()
+    harness.scripts.add(completeStepScript(stepId))
+    harness.scripts.add(async (text, agent) => {
+      if (text.includes('开始执行')) {
+        agent.session.events.push({
+          type: 'assistant/message',
+          seq: 100,
+          time: Date.now(),
+          data: { message: { source: { kind: 'model', provider: 'unpriced-route' } }, usage: { inputTokens: 5, outputTokens: 5 } },
+        } as unknown as SessionEvent)
+      }
+    })
+
+    trigger(dutyId)
+
+    await harness.waitFor(() => harness.duty.duties.get(DutyId(dutyId))?.state.lastOutcome === 'failed')
+    const [run] = harness.duty.duties.runsOf(DutyId(dutyId))
+    expect(run?.summary).toContain("no token price configured for provider 'unpriced-route'")
   })
 
   it('narrows the run agent to the tool allowance and gates gated tools', async () => {

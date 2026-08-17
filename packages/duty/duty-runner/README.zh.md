@@ -11,7 +11,7 @@ run 的 Session 日志是机器状态的唯一权威。每次状态变化都是�
 | 键 | 含义 |
 |---|---|
 | `subagentProvider` | `parallel` 扇出所用 subagent provider;默认 `fork`。 |
-| `tokenPriceUsdPerMillion` | 必填:每百万 token 的综合美元价格,用于 run 成本归属;`0` 关闭成本核算。 |
+| `tokenPrices` | 必填映射:按 provider 路由的每百万 token 美元价格;未配置的 provider 令 run 大声失败,`0` 关闭该路由的核算。 |
 | `maxRepairs` | 0–5:agent 步骤在首次尝试之后的修复次数;默认 2。 |
 
 ```yaml
@@ -19,7 +19,8 @@ run 的 Session 日志是机器状态的唯一权威。每次状态变化都是�
   name: '@deepseek-ai/dsh-duty-runner'
   config:
     subagentProvider: fork
-    tokenPriceUsdPerMillion: 2.0
+    tokenPrices:
+      deepseek-official: 2.0
     maxRepairs: 2
 ```
 
@@ -33,7 +34,7 @@ run 的 Session 日志是机器状态的唯一权威。每次状态变化都是�
 4. **Body。** `agent` 步骤作为 run Agent 上的回合执行;`phase` 步骤按序递归;`parallel` 步骤经 subagent seam 扇出子步骤,只有全部子代理以 `completed` 停止才算完成。
 5. **验证。** `verification: 'on'` 时,已汇报的步骤完成经过配置的 `ctx.dutyVerifiers` 检查器,基于该步骤的证据窗口判定;每次判定记录为 `duty/verdict`,缺失检查器令 run 大声失败,失败判定令 run 停靠在一个持久化的接受/修复选择上(`duty/verdict-appeal`):接受则步骤照样完成,修复则在同一个上限内跑下一次尝试。
 6. **停靠与恢复。** `duty_request_human` 创建持久化 {@link HumanRequest},追加 `duty/human-wait`,并以 `waiting_for_human` 结清 run、保持名额。答复落库后,`dsh-duty` 发出 `duty/human-answered`;runner 恢复同一 Session,追加 `duty/human-answer`,从折叠状态继续。停靠的 run 跨进程重启存活:启动对账重新武装它,并通过重放持久化日志冷恢复被打断的 run。
-6. **结清。** cursor 只在成功时推进。run 成本是该 Session 的 `assistant/message` usage 之和乘以 `tokenPriceUsdPerMillion`;超过 `limits.budgetUsd` 判失败并以 `budget` 暂停,与失败计数无关。连续失败按 `limits.maxConsecutiveFailures` 以 `failures` 暂停。
+6. **结清。** cursor 只在成功时推进。run 成本是该 Session 的 `assistant/message` usage 之和按 provider 的 `tokenPrices` 映射计价;超过 `limits.budgetUsd` 判失败并以 `budget` 暂停,与失败计数无关。连续失败按 `limits.maxConsecutiveFailures` 以 `failures` 暂停。
 
 ## 模型体验
 
@@ -56,5 +57,5 @@ run Session 内只追加:每次尝试在可复用前缀之后延续对话。子�
 - **验证是可选开启的** — 默认 `verification: 'off'` 接受模型自报的 `duty_step_done`;`'on'` 咨询 `ctx.dutyVerifiers` seam,其 evaluator provider 判定证据窗口,失败判定把步骤送回修复。
 - **无跨进程单 run 保证** — claim 经单 Host 进程的域写链串行化;两个 Host 进程同时运行 runner 都会轮询,输掉 claim 竞争的一方得到一条跳过记录。
 - **结构调整由模型撰写** — `duty_adapt_body` 按持久化 schema 校验调整后的 body,但执行前不强制与存储 body 的 diff 审查。
-- **预算定价是单一综合费率** — 按 provider 或模型的定价待做;run 以配置的每百万 token 美元价归集成本。
+- **按 provider 而非按模型定价** — 映射按 provider 路由计价;模型级费率待做。
 - **卸载即停靠而非结清** — 卸载 runner 会释放存活的 run Agent 而不结清;下次启动的对账冷恢复或判失败。

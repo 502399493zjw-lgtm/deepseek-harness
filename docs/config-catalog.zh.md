@@ -601,11 +601,11 @@ export interface Config {
   /** Subagent provider used for `parallel` fan-out. */
   readonly subagentProvider: string
   /**
-   * Blended USD price per million tokens used to attribute cost to a run;
-   * zero disables cost accounting (a Duty with a budget then never pauses on
-   * it).
+   * USD price per million tokens keyed by provider route. A run whose usage
+   * names an unconfigured provider fails loudly instead of pricing it at
+   * zero; set a provider's price to 0 to disable cost accounting for it.
    */
-  readonly tokenPriceUsdPerMillion: number
+  readonly tokenPrices: Readonly<Record<string, number>>
   /** Repairs per agent step after the first attempt, 0–5. */
   readonly maxRepairs: number
 }

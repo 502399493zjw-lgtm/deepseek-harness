@@ -62,11 +62,11 @@ export interface Config {
   /** Subagent provider used for `parallel` fan-out. */
   readonly subagentProvider: string
   /**
-   * Blended USD price per million tokens used to attribute cost to a run;
-   * zero disables cost accounting (a Duty with a budget then never pauses on
-   * it).
+   * USD price per million tokens keyed by provider route. A run whose usage
+   * names an unconfigured provider fails loudly instead of pricing it at
+   * zero; set a provider's price to 0 to disable cost accounting for it.
    */
-  readonly tokenPriceUsdPerMillion: number
+  readonly tokenPrices: Readonly<Record<string, number>>
   /** Repairs per agent step after the first attempt, 0–5. */
   readonly maxRepairs: number
 }
@@ -192,7 +192,7 @@ export class DutyRunnerService extends Service {
   /** Loader validation for the run-driving policy. */
   static Config: s<Config> = s.object({
     subagentProvider: s.string().default('fork'),
-    tokenPriceUsdPerMillion: s.number().min(0).required(),
+    tokenPrices: s.dict(s.number().min(0)).required(),
     maxRepairs: s.number().step(1).min(0).max(5).default(2),
   })
 
@@ -795,7 +795,7 @@ export class DutyRunnerService extends Service {
     const budgetUsd = local.spec.limits.budgetUsd
     agent.session.append('duty/run-finish', { status: 'succeeded', summary })
     await this.ctx.sessions.flush(agent.session)
-    if (budgetUsd !== undefined && this.policy.tokenPriceUsdPerMillion > 0 && costUsd > budgetUsd) {
+    if (budgetUsd !== undefined && costUsd > budgetUsd) {
       await this.ctx.duties.settle(local.run.dutyId, local.run.id, {
         status: 'failed',
         summary: `budget exceeded: ${costUsd.toFixed(2)} USD over ${budgetUsd} USD`,
@@ -921,19 +921,35 @@ export class DutyRunnerService extends Service {
     }
   }
 
-  /** Sum one run's token usage and price it under the configured rate. */
+  /**
+   * Sum one run's token usage per provider and price each route under the
+   * configured rate map. Usage from an unconfigured provider fails loud, so
+   * a new model route cannot silently under-report a run's cost.
+   * @param session - the run's Session.
+   * @returns the attributed USD cost.
+   */
   private foldCostUsd(session: Session): number {
-    let tokens = 0
+    const tokensByProvider = new Map<string, number>()
     for (const event of session.events) {
       if (event.type !== 'assistant/message') continue
       const usage = event.data.usage
       if (usage == null) continue
-      tokens += usage.inputTokens + usage.outputTokens
+      const provider = event.data.message.source.provider
+      const total = usage.inputTokens + usage.outputTokens
         + (usage.cacheReadTokens ?? 0)
         + (usage.cacheWriteTokens ?? 0)
         + (usage.reasoningTokens ?? 0)
+      tokensByProvider.set(provider, (tokensByProvider.get(provider) ?? 0) + total)
     }
-    return tokens * this.policy.tokenPriceUsdPerMillion / 1_000_000
+    let costUsd = 0
+    for (const [provider, tokens] of tokensByProvider) {
+      const price = this.policy.tokenPrices[provider]
+      if (price === undefined) {
+        throw new Error(`duty-runner: no token price configured for provider '${provider}'`)
+      }
+      costUsd += tokens * price / 1_000_000
+    }
+    return costUsd
   }
 
   /** Dispose the run's Agent handle, keeping the durable record. */
