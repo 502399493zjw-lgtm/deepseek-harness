@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DutyError } from '../src/index.ts'
+import { dutyStateSchema } from '../src/spec.ts'
 import type { DutyId, DutyRunCause } from '../src/types.ts'
 import {
   createDutyHarness,
@@ -84,6 +85,43 @@ describe('duty service', () => {
     })
   })
 
+  describe('schedule state', () => {
+    it('binds a persisted next wake to the resolving duty version', async () => {
+      const view = await harness.duties.create(createRequest())
+      const nextWakeAt = Date.UTC(2026, 0, 2, 9, 0)
+
+      const state = await harness.duties.setNextWake(view.spec.id, view.spec.version, nextWakeAt)
+
+      expect(state).toMatchObject({ nextWakeAt, nextWakeVersion: view.spec.version })
+      expect(harness.duties.get(view.spec.id)?.state).toMatchObject({
+        nextWakeAt,
+        nextWakeVersion: view.spec.version,
+      })
+    })
+
+    it('does not let an old spec overwrite the current version wake', async () => {
+      const before = await harness.duties.create(createRequest())
+      const after = await harness.duties.edit(
+        before.spec.id,
+        before.spec.version,
+        { title: 'Updated title' },
+      )
+      const currentWakeAt = Date.UTC(2026, 0, 2, 10, 0)
+      await harness.duties.setNextWake(after.spec.id, after.spec.version, currentWakeAt)
+
+      const state = await harness.duties.setNextWake(
+        before.spec.id,
+        before.spec.version,
+        Date.UTC(2026, 0, 2, 9, 0),
+      )
+
+      expect(state).toMatchObject({
+        nextWakeAt: currentWakeAt,
+        nextWakeVersion: after.spec.version,
+      })
+    })
+  })
+
   describe('claiming a run', () => {
     it('refuses to claim a draft duty', async () => {
       const view = await harness.duties.create(createRequest())
@@ -100,6 +138,23 @@ describe('duty service', () => {
       expect(claim.run.status).toBe('running')
       expect(claim.run.sessionId).toBe(sessionId('a'))
       expect(harness.duties.get(id)?.state.running).toBe(true)
+    })
+
+    it('rejects a waking decision resolved from an older duty version', async () => {
+      const id = await activeDuty()
+      const before = harness.duties.get(id)
+      if (before === undefined) throw new Error('expected a duty')
+      await harness.duties.edit(id, before.spec.version, { title: 'Updated title' })
+
+      const claim = await harness.duties.claim(
+        id,
+        sessionId('a'),
+        SCHEDULE,
+        before.spec.version,
+      )
+
+      expect(claim).toMatchObject({ claimed: false, reason: 'not-due' })
+      expect(harness.duties.get(id)?.state.runCount).toBe(0)
     })
 
     it('refuses a second concurrent claim', async () => {
@@ -434,6 +489,24 @@ describe('duty service', () => {
         trigger: { kind: 'manual', description: 'when asked' },
       }))
       expect(view.spec.mode).toBe('once')
+    })
+
+    it('requires a stored next wake instant and duty version together', () => {
+      const state = {
+        dutyId: 'd1',
+        lifecycle: 'active' as const,
+        runCount: 0,
+        running: false,
+        consecutiveFailures: 0,
+      }
+      const version = '11111111-1111-4111-8111-111111111111'
+      expect(dutyStateSchema.safeParse({ ...state, nextWakeAt: 1 }).success).toBe(false)
+      expect(dutyStateSchema.safeParse({ ...state, nextWakeVersion: version }).success).toBe(false)
+      expect(dutyStateSchema.safeParse({
+        ...state,
+        nextWakeAt: 1,
+        nextWakeVersion: version,
+      }).success).toBe(true)
     })
 
     it('rejects an agent step without a prompt', async () => {

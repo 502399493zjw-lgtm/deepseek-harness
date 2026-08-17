@@ -14,7 +14,7 @@
 
 ## 轮询
 
-一次轮询读取一次 `ctx.duties.list()`,跳过所有非 standing、无 `interval`/`cron` 触发、非 `active`、`running` 或存储的 `nextWakeAt` 仍在未来的 Duty。每个到期 Duty 产生一条携带触发描述作为原因、以及计算所得 `nextWakeAt` 的观测;run 运行时保存该值,使重启后仍锚定在计划上。
+一次轮询读取一次 `ctx.duties.list()`,跳过所有非 standing、无 `interval`/`cron` 触发、非 `active`、`running`,或存储的 `nextWakeAt` 由当前 Duty 版本解析且仍在未来的 Duty。规则首次解析到未来发生点时,provider 在不返回观测之前就把该时刻连同当前版本存下,使后续 sweep 与进程重启直接走持久化快路径,不再重算规则;编辑会更换版本并使旧唤醒失效。每个到期 Duty 产生一条携带触发描述作为原因、Duty 版本与后续 `nextWakeAt` 的观测;run 运行时只 claim 该版本,并在 claim 后保存后续唤醒。
 
 ## 模型体验
 
@@ -35,5 +35,4 @@
 ## 已知限制与待办
 
 - **单一共享节奏** — provider 按注册表唯一的 `pollIntervalMs` 被轮询,不自行启动计时器。
-- **首次触发前重复扫描** — cron Duty 首次产生到期观测前,每次 sweep 都会重新计算未来发生点;该观测写入 durable `nextWakeAt` 后,provider 会直接跳到下一次匹配。provider 本地缓存或 Duty domain 排程操作留待后续。
 - **手写五段 cron** — 因仓库没有现成解析库、且所需操作是"此刻之后的最近一次匹配"而本地实现数值子集;若范围语义需要超出该子集,可换用维护中的库。

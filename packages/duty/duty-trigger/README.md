@@ -27,7 +27,7 @@ A provider implements {@link DutyTriggerProvider}: a stable unique `id` and a `p
 
 One sweep polls every provider once at the current wall clock and emits each returned observation as a `duty/trigger` event. Sweeps never overlap: the next timer arms only after the current sweep settles, re-reading the clock each wake instead of accumulating drift. A provider whose poll throws is logged and skipped; it cannot stall the sweep or hide another provider's due work. Concurrent {@link DutyTriggerService.sweep} callers share the one in-flight sweep.
 
-An observation is a candidate, not a decision: the Consumer validates it against the Duty domain and either claims a run or records why it skipped.
+An observation is a candidate, not a decision: it carries the Duty spec version that admitted the wake, and the Consumer claims that exact version through the Duty domain or records why it skipped. Editing a Duty before the claim therefore rejects the stale observation as `not-due` instead of running the new spec for an old schedule.
 
 ## Model Experience
 

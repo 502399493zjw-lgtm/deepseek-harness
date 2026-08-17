@@ -574,15 +574,15 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the frozen updated state.',
       },
       {
-        signature: 'async setNextWake(id: DutyId, nextWakeAt: number): Promise<DutyState>',
-        description: 'Record when this Duty\'s trigger may next fire.',
-        parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'nextWakeAt', description: 'Epoch milliseconds of the next permitted wake.' }],
-        returns: 'the frozen updated state.',
+        signature: 'async setNextWake(id: DutyId, version: DutyVersion, nextWakeAt: number): Promise<DutyState>',
+        description: 'Record when this Duty\'s trigger may next fire and which spec resolved it.',
+        parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'version', description: 'Duty spec version used to resolve the occurrence.' }, { name: 'nextWakeAt', description: 'Epoch milliseconds of the next permitted wake.' }],
+        returns: 'the frozen updated state; a stale version leaves it unchanged.',
       },
       {
-        signature: 'async claim(id: DutyId, sessionId: SessionId, cause: DutyRunCause): Promise<DutyClaim>',
+        signature: 'async claim( id: DutyId, sessionId: SessionId, cause: DutyRunCause, expectedVersion?: DutyVersion, ): Promise<DutyClaim>',
         description: 'Claim this Duty\'s single run slot and open one run record.\n\nThe claim and the run-number allocation happen inside one write-chain transform, so two triggers arriving together cannot both start a run or receive the same index.',
-        parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'sessionId', description: 'The Session that will own this run\'s transcript.' }, { name: 'cause', description: 'What woke this run.' }],
+        parameters: [{ name: 'id', description: 'Duty identity.' }, { name: 'sessionId', description: 'The Session that will own this run\'s transcript.' }, { name: 'cause', description: 'What woke this run.' }, { name: 'expectedVersion', description: 'Spec version that admitted the waking decision; a changed spec rejects the stale decision as `not-due`.' }],
         returns: 'the started run, or the reason no run started.',
       },
       {
@@ -3265,7 +3265,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DutyState',
-    declaration: 'export interface DutyState {\n    readonly dutyId: DutyId;\n    readonly lifecycle: DutyLifecycle;\n    readonly pausedReason?: DutyPauseReason;\n    readonly runCount: number;\n    readonly running: boolean;\n    readonly lastRunId?: DutyRunId;\n    readonly lastRunAt?: number;\n    readonly lastOutcome?: DutyRunStatus;\n    readonly nextWakeAt?: number;\n    readonly consecutiveFailures: number;\n    readonly cursor?: JsonValue;\n}',
+    declaration: 'export interface DutyState {\n    readonly dutyId: DutyId;\n    readonly lifecycle: DutyLifecycle;\n    readonly pausedReason?: DutyPauseReason;\n    readonly runCount: number;\n    readonly running: boolean;\n    readonly lastRunId?: DutyRunId;\n    readonly lastRunAt?: number;\n    readonly lastOutcome?: DutyRunStatus;\n    readonly nextWakeAt?: number;\n    readonly nextWakeVersion?: DutyVersion;\n    readonly consecutiveFailures: number;\n    readonly cursor?: JsonValue;\n}',
   },
   {
     name: 'DutyStep',
@@ -3289,7 +3289,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DutyTriggerObservation',
-    declaration: 'export interface DutyTriggerObservation {\n    readonly dutyId: DutyId;\n    readonly providerId: string;\n    readonly cause: DutyRunCause;\n    readonly occurredAt: number;\n    readonly nextWakeAt?: number;\n}',
+    declaration: 'export interface DutyTriggerObservation {\n    readonly dutyId: DutyId;\n    readonly providerId: string;\n    readonly dutyVersion: DutyVersion;\n    readonly cause: DutyRunCause;\n    readonly occurredAt: number;\n    readonly nextWakeAt?: number;\n}',
   },
   {
     name: 'DutyTriggerProvider',

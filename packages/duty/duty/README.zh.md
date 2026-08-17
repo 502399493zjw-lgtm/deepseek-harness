@@ -31,7 +31,7 @@ DeepSeek Harness 的持久化职责合约。该包注册 `ctx.duties`,持久化 
 
 `create` 依据请求组装合约(手动触发派生 `once`,否则 `standing`,并默认 `verification` 为 `off`),按持久化 schema 校验后以 `draft` 落库。`edit` 在基于不透明 `version` 令牌的比较并交换下替换指定字段,并对合并后的合约重新校验,因此编辑不可能存入重开时会拒绝的合约。`setLifecycle` 在 `draft`、`active`、`paused`、`archived` 之间迁移;进入 `paused` 记录原因,离开时清除原因。
 
-`claim` 在一次域写链变换内占住 Duty 的单 run 名额并分配下一个 run 编号,因此同时到达的两个触发不可能都启动 run 或拿到同一编号。它以 `paused`、`archived`、`running`、`draft` 作为触发的 `skippedReason` 拒绝。`settle` 写入最终 run 记录并执行策略:cursor 只在成功时推进;失败计数在成功时清零,连续失败达 `limits.maxConsecutiveFailures` 次后暂停 Duty;显式 `pause`(如 `budget`)与计数无关立即暂停;`waiting_for_human` 保持名额,因为同一个 run 在答复后继续。
+`setNextWake` 把未来唤醒与解析它的 Duty spec 版本一同存储。`claim` 在一次域写链变换内占住 Duty 的单 run 名额并分配下一个 run 编号,因此同时到达的两个触发不可能都启动 run 或拿到同一编号;Consumer 提供认可本次唤醒的版本时,已变化的 spec 会以 `not-due` 拒绝。其他拒绝以 `paused`、`archived`、`running`、`draft` 作为触发的 `skippedReason`。`settle` 写入最终 run 记录并执行策略:cursor 只在成功时推进;失败计数在成功时清零,连续失败达 `limits.maxConsecutiveFailures` 次后暂停 Duty;显式 `pause`(如 `budget`)与计数无关立即暂停;`waiting_for_human` 保持名额,因为同一个 run 在答复后继续。
 
 `ask` 开启绑定到 run 的 Session 的持久化 {@link HumanRequest};`answer` 结清它,除非 `allowFreeform` 否则强制限定选项,并拒绝重复结清。`recordTrigger` 保存每次唤醒决策的有界审计,包括未运行的跳过原因。
 

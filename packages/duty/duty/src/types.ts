@@ -225,6 +225,8 @@ export interface DutyState {
   readonly lastOutcome?: DutyRunStatus
   /** Earliest time the trigger may fire again, in Unix epoch milliseconds. */
   readonly nextWakeAt?: number
+  /** Duty spec version from which `nextWakeAt` was resolved. */
+  readonly nextWakeVersion?: DutyVersion
   /** Consecutive failed runs since the last success. */
   readonly consecutiveFailures: number
   /**

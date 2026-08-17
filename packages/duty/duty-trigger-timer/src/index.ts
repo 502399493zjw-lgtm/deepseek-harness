@@ -44,15 +44,16 @@ export const Config: s<Config> = s.object({})
 
 /** Render an unknown rule failure for process-local diagnostics only. */
 function renderThrown(value: unknown): string {
-  /* v8 ignore next -- both owned occurrence resolvers throw Error subclasses. */
+  /* v8 ignore next -- owned rule resolvers and Duty storage throw Error subclasses. */
   return value instanceof Error ? value.message : String(value)
 }
 
 /**
  * Waking source for interval and cron Duties. One poll reads the Duty domain
- * once and reports each active, unclaimed standing Duty whose occurrence has
- * arrived, advancing past occurrences missed while the process was down:
- * exactly one observation per due Duty per poll, never one per missed period.
+ * once, persists the first resolved future occurrence for durable skip-ahead,
+ * and reports each active, unclaimed standing Duty whose occurrence has
+ * arrived. Missed occurrences advance without replay: exactly one observation
+ * per due Duty per poll, never one per missed period.
  */
 export class TimerDutyTriggerProvider implements DutyTriggerProvider {
   readonly id = TIMER_PROVIDER_ID
@@ -68,19 +69,24 @@ export class TimerDutyTriggerProvider implements DutyTriggerProvider {
   ) {}
 
   /**
-   * Report every Duty due at the given instant.
+   * Report every Duty due at the given instant, storing a resolved future
+   * occurrence so later sweeps and restarts skip directly to it.
    * @param now - The registry's wall-clock reading at sweep time.
    * @returns due observations; a Duty whose rule fails to resolve is skipped
    * with a warning rather than misreported as due.
    */
-  poll(now: number): Promise<readonly DutyTriggerObservation[]> {
+  async poll(now: number): Promise<readonly DutyTriggerObservation[]> {
     const observations: DutyTriggerObservation[] = []
     for (const view of this.duties.list()) {
       const { spec, state } = view
       if (spec.mode !== 'standing') continue
       if (spec.trigger.kind === 'manual') continue
       if (state.lifecycle !== 'active' || state.running) continue
-      if (state.nextWakeAt !== undefined && now < state.nextWakeAt) continue
+      if (
+        state.nextWakeVersion === spec.version
+        && state.nextWakeAt !== undefined
+        && now < state.nextWakeAt
+      ) continue
 
       let decision
       try {
@@ -99,17 +105,29 @@ export class TimerDutyTriggerProvider implements DutyTriggerProvider {
         }
         continue
       }
-      if (!decision.due) continue
+      if (!decision.due) {
+        if (decision.occurrenceAt !== undefined) {
+          try {
+            await this.duties.setNextWake(spec.id, spec.version, decision.occurrenceAt)
+          } catch (error: unknown) {
+            this.ctx.logger.warn(
+              `duty-trigger-timer: could not store next wake for duty '${spec.id}': ${renderThrown(error)}`,
+            )
+          }
+        }
+        continue
+      }
       observations.push({
         dutyId: spec.id,
         providerId: TIMER_PROVIDER_ID,
+        dutyVersion: spec.version,
         cause: { kind: 'schedule', reason: spec.trigger.description },
         occurredAt: now,
         /* v8 ignore next -- every owned occurrence resolver supplies a following wake. */
         ...(decision.nextWakeAt === undefined ? {} : { nextWakeAt: decision.nextWakeAt }),
       })
     }
-    return Promise.resolve(observations)
+    return observations
   }
 }
 

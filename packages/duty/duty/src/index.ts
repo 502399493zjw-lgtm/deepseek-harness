@@ -387,14 +387,17 @@ export class DutyService extends TypertRemoteService {
   }
 
   /**
-   * Record when this Duty's trigger may next fire.
+   * Record when this Duty's trigger may next fire and which spec resolved it.
    * @param id - Duty identity.
+   * @param version - Duty spec version used to resolve the occurrence.
    * @param nextWakeAt - Epoch milliseconds of the next permitted wake.
-   * @returns the frozen updated state.
+   * @returns the frozen updated state; a stale version leaves it unchanged.
    */
-  async setNextWake(id: DutyId, nextWakeAt: number): Promise<DutyState> {
+  async setNextWake(id: DutyId, version: DutyVersion, nextWakeAt: number): Promise<DutyState> {
     const next = await this.requireState()
-      .update(id, current => ({ ...current, nextWakeAt }))
+      .update(id, current => this.requireSpecs().get(id)?.version === version
+        ? { ...current, nextWakeAt, nextWakeVersion: version }
+        : current)
       .catch(this.rethrowMissing(id))
     return snapshotState(next)
   }
@@ -408,14 +411,25 @@ export class DutyService extends TypertRemoteService {
    * @param id - Duty identity.
    * @param sessionId - The Session that will own this run's transcript.
    * @param cause - What woke this run.
+   * @param expectedVersion - Spec version that admitted the waking decision;
+   * a changed spec rejects the stale decision as `not-due`.
    * @returns the started run, or the reason no run started.
    */
-  async claim(id: DutyId, sessionId: SessionId, cause: DutyRunCause): Promise<DutyClaim> {
+  async claim(
+    id: DutyId,
+    sessionId: SessionId,
+    cause: DutyRunCause,
+    expectedVersion?: DutyVersion,
+  ): Promise<DutyClaim> {
     let skipped: DutySkipReason | undefined
     let run: DutyRun | undefined
     const startedAt = Date.now()
     const runId = randomUUID() as DutyRunId
     await this.requireState().update(id, (current) => {
+      if (expectedVersion !== undefined && this.requireSpecs().get(id)?.version !== expectedVersion) {
+        skipped = 'not-due'
+        return current
+      }
       if (current.running) {
         skipped = 'running'
         return current

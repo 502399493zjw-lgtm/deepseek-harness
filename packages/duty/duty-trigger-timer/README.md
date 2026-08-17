@@ -14,7 +14,7 @@ Rule math lives in [`src/domain.ts`](src/domain.ts) as pure deterministic functi
 
 ## Polling
 
-One poll reads `ctx.duties.list()` once and skips every Duty that is not a standing one with an `interval` or `cron` trigger, is not `active`, is `running`, or whose stored `nextWakeAt` lies in the future. Each due Duty yields one observation carrying its trigger description as the cause, and its computed `nextWakeAt`; the run runtime stores that value so a restart keeps the schedule anchored.
+One poll reads `ctx.duties.list()` once and skips every Duty that is not a standing one with an `interval` or `cron` trigger, is not `active`, is `running`, or whose stored `nextWakeAt` was resolved from the current Duty version and lies in the future. When a rule first resolves to a future occurrence, the provider stores that instant with the current version before returning no observation, so later sweeps and process restarts take the durable fast path instead of recomputing the rule; an edit changes the version and invalidates the old wake. Each due Duty yields one observation carrying its trigger description as the cause, its Duty version, and the following `nextWakeAt`; the run runtime claims only that version and stores the following wake after the claim.
 
 ## Model Experience
 
@@ -35,5 +35,4 @@ Independent. Polls do not touch a model request prefix and cannot invalidate an 
 ## Known Limitations and Deferred Work
 
 - **One shared cadence** — the provider is polled at the registry's single `pollIntervalMs`; it does not arm its own timers.
-- **Pre-first-fire rescans** — until a cron Duty emits its first due observation, each sweep recomputes the future occurrence; after that observation stores durable `nextWakeAt`, the provider skips directly to the next match. A provider-local cache or a Duty-domain scheduling operation is deferred.
 - **Hand-rolled five-field cron** — the numeric subset is implemented locally because the tree has no maintained parser and the needed operation is "next match at or after an instant"; swap for a maintained library if range semantics ever need to grow beyond this subset.

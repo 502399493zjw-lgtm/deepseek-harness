@@ -46,7 +46,27 @@ const ctxStub = (warn: ReturnType<typeof vi.fn> = vi.fn()): Context =>
 
 const dutiesStub = (views: readonly DutyView[]): never => ({
   list: () => views,
+  setNextWake: () => Promise.resolve({}),
 }) as never
+
+/** A Duty service stub whose next-wake writes feed the following list read. */
+function mutableDuties(initial: DutyView): {
+  readonly service: never
+  readonly setNextWake: ReturnType<typeof vi.fn>
+} {
+  let current = initial
+  const setNextWake = vi.fn((_: DutyId, version: DutySpec['version'], nextWakeAt: number) => {
+    current = {
+      ...current,
+      state: { ...current.state, nextWakeAt, nextWakeVersion: version },
+    }
+    return Promise.resolve(current.state)
+  })
+  return {
+    service: { list: () => [current], setNextWake } as never,
+    setNextWake,
+  }
+}
 
 describe('timer duty trigger provider', () => {
   it('reports a due interval duty with its next wake', async () => {
@@ -59,6 +79,7 @@ describe('timer duty trigger provider', () => {
     expect(observations[0]).toMatchObject({
       dutyId: DutyId('d1'),
       providerId: 'timer',
+      dutyVersion: 'v1',
       cause: { kind: 'schedule', reason: 'every hour' },
       nextWakeAt: NOW + 3_600_000,
     })
@@ -107,18 +128,66 @@ describe('timer duty trigger provider', () => {
     expect(await provider.poll(T0 + 1_800_000)).toHaveLength(0)
   })
 
-  it('skips a duty whose next wake is still in the future', async () => {
+  it('persists and reuses a future zoned cron wake before the first fire', async () => {
+    const { service, setNextWake } = mutableDuties(view({
+      trigger: {
+        kind: 'cron',
+        description: 'every morning in Shanghai',
+        expr: '0 9 * * *',
+        timezone: 'Asia/Shanghai',
+      },
+    }, {}))
+    const provider = new TimerDutyTriggerProvider(ctxStub(), service)
+    const firstWake = T0 + 3_600_000
+
+    expect(await provider.poll(T0)).toHaveLength(0)
+    expect(setNextWake).toHaveBeenCalledWith(DutyId('d1'), 'v1', firstWake)
+
+    expect(await provider.poll(T0 + 30_000)).toHaveLength(0)
+    expect(setNextWake).toHaveBeenCalledTimes(1)
+
+    expect(await provider.poll(firstWake)).toHaveLength(1)
+  })
+
+  it('warns and retries later when a future wake cannot be stored', async () => {
+    const warn = vi.fn()
+    const setNextWake = vi.fn(() => Promise.reject(new Error('storage offline')))
+    const provider = new TimerDutyTriggerProvider(
+      ctxStub(warn),
+      { list: () => [view({}, {})], setNextWake } as never,
+    )
+
+    expect(await provider.poll(T0 + 1_800_000)).toHaveLength(0)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not store next wake'))
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('storage offline'))
+  })
+
+  it('skips a duty whose version-bound next wake is still in the future', async () => {
     const provider = new TimerDutyTriggerProvider(
       ctxStub(),
-      dutiesStub([view({}, { nextWakeAt: NOW + 60_000 })]),
+      dutiesStub([view({}, { nextWakeAt: NOW + 60_000, nextWakeVersion: 'v1' as DutySpec['version'] })]),
     )
     expect(await provider.poll(NOW)).toHaveLength(0)
+  })
+
+  it('recomputes a future wake resolved from an older duty version', async () => {
+    const provider = new TimerDutyTriggerProvider(
+      ctxStub(),
+      dutiesStub([view(
+        { version: 'v2' as DutySpec['version'] },
+        { nextWakeAt: NOW + 60_000, nextWakeVersion: 'v1' as DutySpec['version'] },
+      )]),
+    )
+    expect(await provider.poll(NOW)).toHaveLength(1)
   })
 
   it('evaluates a duty whose next wake has passed', async () => {
     const provider = new TimerDutyTriggerProvider(
       ctxStub(),
-      dutiesStub([view({}, { nextWakeAt: NOW - 60_000 })]),
+      dutiesStub([view({}, {
+        nextWakeAt: NOW - 60_000,
+        nextWakeVersion: 'v1' as DutySpec['version'],
+      })]),
     )
     expect(await provider.poll(NOW)).toHaveLength(1)
   })

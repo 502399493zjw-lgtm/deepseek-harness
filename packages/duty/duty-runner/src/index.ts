@@ -257,7 +257,7 @@ export class DutyRunnerService extends Service {
     const view = this.ctx.duties.get(dutyId)
     if (view === undefined) throw new DutyError('duty-not-found', `no duty '${dutyId}'`)
     const sessionId = SessionId(randomUUID())
-    const claim = await this.ctx.duties.claim(dutyId, sessionId, cause)
+    const claim = await this.ctx.duties.claim(dutyId, sessionId, cause, view.spec.version)
     if (!claim.claimed) {
       await this.ctx.duties.recordTrigger({
         dutyId,
@@ -292,7 +292,12 @@ export class DutyRunnerService extends Service {
     const view = this.ctx.duties.get(observation.dutyId)
     if (view === undefined) return
     const sessionId = SessionId(randomUUID())
-    const claim = await this.ctx.duties.claim(observation.dutyId, sessionId, observation.cause)
+    const claim = await this.ctx.duties.claim(
+      observation.dutyId,
+      sessionId,
+      observation.cause,
+      observation.dutyVersion,
+    )
     if (!claim.claimed) {
       await this.ctx.duties.recordTrigger({
         dutyId: observation.dutyId,
@@ -309,7 +314,11 @@ export class DutyRunnerService extends Service {
       runId: claim.run.id,
     })
     if (observation.nextWakeAt !== undefined) {
-      await this.ctx.duties.setNextWake(observation.dutyId, observation.nextWakeAt)
+      await this.ctx.duties.setNextWake(
+        observation.dutyId,
+        observation.dutyVersion,
+        observation.nextWakeAt,
+      )
     }
     this.trackRun(claim.run, view.spec)
   }

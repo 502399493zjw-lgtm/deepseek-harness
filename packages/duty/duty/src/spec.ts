@@ -20,6 +20,7 @@ import type {
   DutyState,
   DutyStep,
   DutyTriggerEvent,
+  DutyVersion,
   HumanRequest,
   HumanRequestId,
 } from './types.ts'
@@ -273,6 +274,7 @@ export const dutyStateSchema = z.object({
     z.literal('canceled'),
   ]).optional(),
   nextWakeAt: epochMillis.optional(),
+  nextWakeVersion: z.uuid().transform(value => value as DutyVersion).optional(),
   consecutiveFailures: z.number().int().nonnegative(),
   cursor: z.unknown().optional(),
 }).superRefine((state, ctx) => {
@@ -281,6 +283,12 @@ export const dutyStateSchema = z.object({
   }
   if (state.lifecycle !== 'paused' && state.pausedReason !== undefined) {
     ctx.addIssue({ code: 'custom', path: ['pausedReason'], message: 'only a paused duty records a pause reason' })
+  }
+  if (state.nextWakeAt !== undefined && state.nextWakeVersion === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['nextWakeVersion'], message: 'a next wake records its duty version' })
+  }
+  if (state.nextWakeAt === undefined && state.nextWakeVersion !== undefined) {
+    ctx.addIssue({ code: 'custom', path: ['nextWakeAt'], message: 'a next wake version records its instant' })
   }
 }) as unknown as z.ZodType<DutyState>
 

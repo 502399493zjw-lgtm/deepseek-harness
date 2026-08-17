@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { DutyId } from '@deepseek-ai/dsh-duty'
+import type { DutyVersion } from '@deepseek-ai/dsh-duty'
 import DutyTriggerService from '../src/index.ts'
 import * as DutyTriggerInvariant from '../src/invariant.ts'
 import type { DutyTriggerObservation, DutyTriggerProvider } from '../src/types.ts'
@@ -27,6 +28,7 @@ class ScriptedProvider implements DutyTriggerProvider {
 const observation = (providerId: string): DutyTriggerObservation => ({
   dutyId: DutyId('d1'),
   providerId,
+  dutyVersion: 'v1' as DutyVersion,
   cause: { kind: 'schedule', reason: 'the hourly trigger fired' },
   occurredAt: 5,
 })

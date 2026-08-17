@@ -27,7 +27,7 @@ provider 实现 {@link DutyTriggerProvider}:稳定的唯一 `id` 与只返回到
 
 一次 sweep 按当前墙钟轮询每个 provider 一次,并把每条观测以 `duty/trigger` 事件发布。sweep 永不重叠:下一次计时器只在当前 sweep 落定后启动,每次唤醒重读时钟而不累积漂移。poll 抛错的 provider 被记录并跳过,既不会拖住 sweep,也不会掩盖其他 provider 的到期任务。并发 {@link DutyTriggerService.sweep} 调用共享同一次在途 sweep。
 
-观测是候选而非决定:Consumer 对照 Duty 域校验,然后要么 claim 一个 run,要么记录跳过原因。
+观测是候选而非决定:它携带认可本次唤醒的 Duty spec 版本,Consumer 要么通过 Duty 域 claim 该精确版本,要么记录跳过原因。因此在 claim 前编辑 Duty 会把旧观测以 `not-due` 拒绝,不会因旧计划运行新 spec。
 
 ## 模型体验
 

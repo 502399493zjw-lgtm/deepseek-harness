@@ -5,7 +5,7 @@
  * @module @deepseek-ai/dsh-duty-trigger/types
  */
 
-import type { DutyId, DutyRunCause } from '@deepseek-ai/dsh-duty'
+import type { DutyId, DutyRunCause, DutyVersion } from '@deepseek-ai/dsh-duty'
 
 /**
  * One normalized waking observation from one provider. It is a candidate, not
@@ -17,6 +17,8 @@ export interface DutyTriggerObservation {
   readonly dutyId: DutyId
   /** The reporting provider's registered id, for diagnostics. */
   readonly providerId: string
+  /** Duty spec version that admitted this waking decision. */
+  readonly dutyVersion: DutyVersion
   /** What woke the Duty and a human-readable statement of the cause. */
   readonly cause: DutyRunCause
   /** Provider clock time of the occurrence in Unix epoch milliseconds. */

@@ -112,12 +112,13 @@ Every mutation that must not interleave with another runs through the domain's `
 @Remote('setLifecycle') async setLifecycle( id: DutyId, lifecycle: DutyLifecycle, reason?: DutyPauseReason, ): Promise<DutyState>
 
 /**
- * Record when this Duty's trigger may next fire.
+ * Record when this Duty's trigger may next fire and which spec resolved it.
  * @param id - Duty identity.
+ * @param version - Duty spec version used to resolve the occurrence.
  * @param nextWakeAt - Epoch milliseconds of the next permitted wake.
- * @returns the frozen updated state.
+ * @returns the frozen updated state; a stale version leaves it unchanged.
  */
-async setNextWake(id: DutyId, nextWakeAt: number): Promise<DutyState>
+async setNextWake(id: DutyId, version: DutyVersion, nextWakeAt: number): Promise<DutyState>
 
 /**
  * Claim this Duty's single run slot and open one run record.
@@ -128,9 +129,11 @@ async setNextWake(id: DutyId, nextWakeAt: number): Promise<DutyState>
  * @param id - Duty identity.
  * @param sessionId - The Session that will own this run's transcript.
  * @param cause - What woke this run.
+ * @param expectedVersion - Spec version that admitted the waking decision;
+ * a changed spec rejects the stale decision as `not-due`.
  * @returns the started run, or the reason no run started.
  */
-async claim(id: DutyId, sessionId: SessionId, cause: DutyRunCause): Promise<DutyClaim>
+async claim( id: DutyId, sessionId: SessionId, cause: DutyRunCause, expectedVersion?: DutyVersion, ): Promise<DutyClaim>
 
 /**
  * Settle one run and apply the Duty's failure, budget, and cursor policy.

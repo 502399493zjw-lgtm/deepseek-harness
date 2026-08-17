@@ -192,9 +192,12 @@ describe('duty run runtime', () => {
   }
 
   const trigger = (dutyId: string): void => {
+    const view = harness.duty.duties.get(DutyId(dutyId))
+    if (view === undefined) throw new Error(`missing duty '${dutyId}'`)
     harness.ctx.emit('duty/trigger', {
       dutyId: DutyId(dutyId),
       providerId: 'timer',
+      dutyVersion: view.spec.version,
       cause: SCHEDULE,
       occurredAt: Date.now(),
     })
@@ -225,6 +228,32 @@ describe('duty run runtime', () => {
     await harness.waitFor(() =>
       harness.duty.duties.triggerEventsOf(DutyId(dutyId)).some(event => !event.matched))
     expect(harness.duty.duties.get(DutyId(dutyId))?.state.running).toBe(false)
+  })
+
+  it('rejects a trigger observation resolved from an older duty version', async () => {
+    const { dutyId } = await activeDuty()
+    const before = harness.duty.duties.get(DutyId(dutyId))
+    if (before === undefined) throw new Error(`missing duty '${dutyId}'`)
+    await harness.duty.duties.edit(
+      DutyId(dutyId),
+      before.spec.version,
+      { title: 'Updated duty' },
+    )
+
+    harness.ctx.emit('duty/trigger', {
+      dutyId: DutyId(dutyId),
+      providerId: 'timer',
+      dutyVersion: before.spec.version,
+      cause: SCHEDULE,
+      occurredAt: Date.now(),
+    })
+
+    await harness.waitFor(() => harness.duty.duties.triggerEventsOf(DutyId(dutyId)).length === 1)
+    expect(harness.duty.duties.get(DutyId(dutyId))?.state.runCount).toBe(0)
+    expect(harness.duty.duties.triggerEventsOf(DutyId(dutyId))[0]).toMatchObject({
+      matched: false,
+      skippedReason: 'not-due',
+    })
   })
 
   it('repairs a step that never reports completion, then fails the run', async () => {
