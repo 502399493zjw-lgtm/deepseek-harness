@@ -12,10 +12,9 @@ Keep this file named exactly `AGENTS.md`. Do not create `agent.md`, `agents.md`,
 
 The implementation may span these internal packages in the same `deepseek-harness` repository:
 
-- `packages/bundle/dsh-codex_shared_pool`: public bundle, composition, project documentation, and project-level tests.
+- `packages/bundle/dsh-codex_shared_pool`: public bundle, Host and browser entries, composition, project documentation, and project-level tests.
 - `packages/host/codex-quota`: local official Codex app-server access and credential-safe host behavior.
 - `packages/api/remotes`: typed browser Remote fields and transport contract.
-- `packages/client/ui-codex-quota`: browser UI and user-visible loading, ready, empty, and error states.
 
 These internal packages are parts of one product, not independent Codex plugins. New Codex account-pool capabilities must be installed through this bundle, even when their implementation belongs in one of the internal packages.
 
@@ -78,7 +77,7 @@ pnpm exec tsc -b packages/bundle/dsh-codex_shared_pool
 pnpm run verify-translation-pairing packages/bundle/dsh-codex_shared_pool/README.md
 ```
 
-When an internal package changes, also run its focused tests and TypeScript build. Relevant test directories are `packages/host/codex-quota/tests`, `packages/api/remotes/tests`, and `packages/client/ui-codex-quota/tests`. Do not default to the full repository suite; widen checks only when the changed behavior crosses a broader composition boundary or focused evidence is insufficient.
+When an internal package changes, also run its focused tests and TypeScript build. Relevant test directories are `packages/host/codex-quota/tests` and `packages/api/remotes/tests`. Do not default to the full repository suite; widen checks only when the changed behavior crosses a broader composition boundary or focused evidence is insufficient.
 
 ## Handoff requirements
 

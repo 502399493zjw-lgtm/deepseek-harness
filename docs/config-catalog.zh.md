@@ -467,6 +467,48 @@ export interface Config {
 
 来源：[`packages/code-runtime/code-runtime-worker-thread/src/index.ts:25`](../packages/code-runtime/code-runtime-worker-thread/src/index.ts)
 
+<a id="deepseek-aidsh-codex_shared_pool"></a>
+
+## `@deepseek-ai/dsh-codex_shared_pool`
+
+需要：`llm` · `web`
+
+```ts config-catalog
+/** Composite model and standalone-search configuration. */
+export interface Config {
+  /** Read-only Codex account-pool quota projection for the browser sidebar. */
+  quota?: CodexQuotaConfig
+  /** Model used for auxiliary standalone searches. */
+  searchModel?: string
+  /** Cached, indexed, or live web access. */
+  searchMode?: OpenAICodexSearchMode
+  /** Amount of search context returned by the provider. */
+  searchContextSize?: OpenAICodexSearchContextSize
+  /** Maximum generated tokens returned by the standalone search endpoint. */
+  searchMaxOutputTokens?: number
+  /** Extend Harness read_image with HTTP(S) URL input. */
+  modifyReadImage?: boolean
+  /** Allow non-Codex vision models to call imagegen. */
+  shareImagegenWithOtherModels?: boolean
+  /** Reuse matching Codex context through the session's WebSocket connection. */
+  useWebSocketContextReuse?: boolean
+  /** Use Codex's priority service tier when the selected model supports Fast. */
+  useFastMode?: boolean
+  /** Use Codex V2 Responses compaction for Harness compaction calls. */
+  useNativeCompaction?: boolean
+}
+
+/** Search modes accepted by the official standalone endpoint. */
+export type OpenAICodexSearchMode = 'cached' | 'indexed' | 'live'
+
+/** Provider search-context sizes accepted by the standalone endpoint. */
+export type OpenAICodexSearchContextSize = 'low' | 'medium' | 'high'
+```
+
+依赖：[`CodexQuotaConfig`](#deepseek-aidsh-host-codex-quota)
+
+来源：[`packages/bundle/dsh-codex_shared_pool/src/index.ts:110`](../packages/bundle/dsh-codex_shared_pool/src/index.ts)
+
 <a id="deepseek-aidsh-compaction-basic"></a>
 
 ## `@deepseek-ai/dsh-compaction-basic`
@@ -756,6 +798,30 @@ export interface Config {
 ```
 
 来源：[`packages/host/apiproxy/src/index.ts:41`](../packages/host/apiproxy/src/index.ts)
+
+<a id="deepseek-aidsh-host-codex-quota"></a>
+
+## `@deepseek-ai/dsh-host-codex-quota`
+
+需要：`subprocess`
+
+```ts config-catalog
+/** Deployment policy for Codex homes and app-server lifecycle bounds. */
+export interface Config {
+  /** Ordered Codex homes; the first is the active account. */
+  accountHomes?: string[]
+  /** Minimum time a successful or unavailable snapshot remains cached. */
+  refreshIntervalMs?: number
+  /** Deadline for one account's app-server requests. */
+  requestTimeoutMs?: number
+  /** Grace between managed child-process termination tiers. */
+  disposeGraceMs?: number
+  /** Codex executable name or absolute path in the subprocess execution world. */
+  codexCommand?: string
+}
+```
+
+来源：[`packages/host/codex-quota/src/index.ts:22`](../packages/host/codex-quota/src/index.ts)
 
 <a id="deepseek-aidsh-host-directory-picker-browse"></a>
 
@@ -3034,6 +3100,7 @@ export interface Config {
 - `@deepseek-ai/dsh-client-modules` — 需要 `webServer` · `loader`（[`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts)）
 - `@deepseek-ai/dsh-client-runtime`（[`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-agent-preset`（[`packages/client/ui-agent-preset/src/index.ts`](../packages/client/ui-agent-preset/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-codex-quota`（[`packages/client/ui-codex-quota/src/index.ts`](../packages/client/ui-codex-quota/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-commands`（[`packages/client/ui-commands/src/index.ts`](../packages/client/ui-commands/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-conversation`（[`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-cordis`（[`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts)）

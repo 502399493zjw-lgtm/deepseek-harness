@@ -837,6 +837,69 @@ stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 
 Source: [`packages/llm/llm/src/index.ts:284`](../../packages/llm/llm/src/index.ts)
 
+<a id="ctxopenaicodex--openaicodexservice"></a>
+
+### `ctx.openAICodex` — `OpenAICodexService`
+
+One provider-owned host service shared by Web routes and terminal adapters. Credentials and live policy stay singletons even when several front doors are mounted.
+
+```ts cordis-catalog
+/**
+ * Attach the durable settings document when the active profile provides it.
+ * @param ctx - Settings-capable plugin context.
+ */
+attachSettings(ctx: Context): void
+
+/**
+ * Start the provider-native OAuth lifecycle.
+ * @param interaction - Authentication prompts and notifications.
+ */
+login(interaction: AuthInteraction): Promise<void>
+
+/** Remove this plugin's credential without touching Codex CLI/Desktop. */
+logout(): Promise<void>
+
+/**
+ * Read non-secret authentication metadata.
+ * @returns Authentication state and token expiry metadata.
+ */
+authStatus(): Promise<OpenAICodexAuthStatus>
+
+/**
+ * Read current subscription limits without issuing a model request.
+ * @returns Secret-free quota projection.
+ */
+usage(): Promise<OpenAICodexUsage>
+
+/**
+ * Read current image-tool preferences.
+ * @returns Current image-tool preferences.
+ */
+imagePreferences(): ImageToolPreferences
+
+/**
+ * Persist image-tool preference fields.
+ * @param patch - Fields to update.
+ * @returns Authoritative preferences after the update.
+ */
+updateImagePreferences(patch: Partial<ImageToolPreferences>): Promise<ImageToolPreferences>
+
+/**
+ * Read current Codex Responses preferences.
+ * @returns Current Codex Responses preferences.
+ */
+responsePreferences(): ResponseApiPreferences
+
+/**
+ * Persist Codex Responses preference fields.
+ * @param patch - Fields to update.
+ * @returns Authoritative preferences after the update.
+ */
+updateResponsePreferences(patch: Partial<ResponseApiPreferences>): Promise<ResponseApiPreferences>
+```
+
+Source: [`packages/bundle/dsh-codex_shared_pool/src/service.ts:30`](../../packages/bundle/dsh-codex_shared_pool/src/service.ts)
+
 <a id="llm-events"></a>
 
 ### `llm/*` events

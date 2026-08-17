@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/codex-quota/README.md
-README.md: da68a1d52fa5d45f9573c13e1f3307dea2539910
-README.zh.md: 3f81aeb99f62889f78bb4821db80bb809687f492
+README.md: a70044ad50a5f04170d487522c5149455706c30f
+README.zh.md: 39120081382910f429ff5f972797808a7928a496

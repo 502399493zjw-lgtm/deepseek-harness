@@ -907,6 +907,74 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'openAICodex',
+    summary: 'One provider-owned host service shared by Web routes and terminal adapters.',
+    description: 'One provider-owned host service shared by Web routes and terminal adapters. Credentials and live policy stay singletons even when several front doors are mounted.',
+    methods: [
+      {
+        signature: 'readonly credentials: OpenAICodexCredentialStore',
+        description: 'Profile-aware OAuth credential source.',
+        parameters: [],
+      },
+      {
+        signature: 'readonly policy: ImageToolPolicy',
+        description: 'Live image and Responses preference owner.',
+        parameters: [],
+      },
+      {
+        signature: 'attachSettings(ctx: Context): void',
+        description: 'Attach the durable settings document when the active profile provides it.',
+        parameters: [{ name: 'ctx', description: 'Settings-capable plugin context.' }],
+      },
+      {
+        signature: 'login(interaction: AuthInteraction): Promise<void>',
+        description: 'Start the provider-native OAuth lifecycle.',
+        parameters: [{ name: 'interaction', description: 'Authentication prompts and notifications.' }],
+      },
+      {
+        signature: 'logout(): Promise<void>',
+        description: 'Remove this plugin\'s credential without touching Codex CLI/Desktop.',
+        parameters: [],
+      },
+      {
+        signature: 'authStatus(): Promise<OpenAICodexAuthStatus>',
+        description: 'Read non-secret authentication metadata.',
+        parameters: [],
+        returns: 'Authentication state and token expiry metadata.',
+      },
+      {
+        signature: 'usage(): Promise<OpenAICodexUsage>',
+        description: 'Read current subscription limits without issuing a model request.',
+        parameters: [],
+        returns: 'Secret-free quota projection.',
+      },
+      {
+        signature: 'imagePreferences(): ImageToolPreferences',
+        description: 'Read current image-tool preferences.',
+        parameters: [],
+        returns: 'Current image-tool preferences.',
+      },
+      {
+        signature: 'updateImagePreferences(patch: Partial<ImageToolPreferences>): Promise<ImageToolPreferences>',
+        description: 'Persist image-tool preference fields.',
+        parameters: [{ name: 'patch', description: 'Fields to update.' }],
+        returns: 'Authoritative preferences after the update.',
+      },
+      {
+        signature: 'responsePreferences(): ResponseApiPreferences',
+        description: 'Read current Codex Responses preferences.',
+        parameters: [],
+        returns: 'Current Codex Responses preferences.',
+      },
+      {
+        signature: 'updateResponsePreferences(patch: Partial<ResponseApiPreferences>): Promise<ResponseApiPreferences>',
+        description: 'Persist Codex Responses preference fields.',
+        parameters: [{ name: 'patch', description: 'Fields to update.' }],
+        returns: 'Authoritative preferences after the update.',
+      },
+    ],
+  },
+  {
     key: 'permissionPresets',
     summary: 'Owns the deployment\'s permission presets and their write path.',
     description: 'Owns the deployment\'s permission presets and their write path. Requires a confining `ctx.shell` executor and `ctx.approval`; unmatched knob values are reported as CUSTOM_PRESET, not an error.',
@@ -2774,6 +2842,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface CodeRunResult {\n    value?: CodeJsonValue;\n    logs: string[];\n    error?: CodeRunFailure;\n}',
   },
   {
+    name: 'CodexProfileSummary',
+    declaration: 'export interface CodexProfileSummary {\n    id: string;\n    label: string;\n    active: boolean;\n    createdAt: number;\n    updatedAt: number;\n}',
+  },
+  {
     name: 'CollectedOutput',
     declaration: 'export interface CollectedOutput {\n    text: string;\n    truncated: boolean;\n    spillPath?: string;\n}',
   },
@@ -3146,6 +3218,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ImageMediaType = \'image/png\' | \'image/jpeg\' | \'image/webp\' | \'image/gif\';',
   },
   {
+    name: 'ImageToolPolicy',
+    declaration: 'export class ImageToolPolicy {\n    constructor(base: Partial<OpenAICodexPreferences> = {});\n    attach(ctx: Context): void;\n    snapshot(): ImageToolPreferences;\n    watchImagePreferences(listener: () => void): () => void;\n    async update(patch: Partial<ImageToolPreferences>): Promise<ImageToolPreferences>;\n    responseApiSnapshot(): ResponseApiPreferences;\n    async updateResponseApi(patch: Partial<ResponseApiPreferences>): Promise<ResponseApiPreferences>;\n    assertAllowed(exec: ToolExecution, tool: \'imagegen\'): void;\n}',
+  },
+  {
+    name: 'ImageToolPreferences',
+    declaration: 'export interface ImageToolPreferences {\n    modifyReadImage: boolean;\n    shareImagegenWithOtherModels: boolean;\n}',
+  },
+  {
     name: 'Inbox',
     declaration: 'export class Inbox {\n    constructor(private readonly session: Session, private readonly notifications: InboxNotifications);\n    get nextTurn(): readonly UserMessage[];\n    get nextStep(): readonly UserMessage[];\n    get hasPending(): boolean;\n    clear(): void;\n    claim(target: InboxTarget, turn: number): UserMessage[];\n    append(target: InboxTarget, message: UserMessage): void;\n    prepend(target: InboxTarget, message: UserMessage): void;\n    replace(messageId: MessageId, newMessage: UserMessage): boolean;\n    remove(messageId: MessageId): boolean;\n    splice(target: InboxTarget, start: number, deleteCount: number, inserted: UserMessage[]): UserMessage[];\n}',
   },
@@ -3474,6 +3554,34 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface OneShotSubagentDescriptorData extends SubagentDescriptorBase {\n    readonly mode: \'one-shot\';\n    readonly label?: string;\n}',
   },
   {
+    name: 'OpenAICodexAuthStatus',
+    declaration: 'export interface OpenAICodexAuthStatus {\n    authenticated: boolean;\n    expiresAt?: Date;\n}',
+  },
+  {
+    name: 'OpenAICodexCredentialStore',
+    declaration: 'export class OpenAICodexCredentialStore implements CredentialStore {\n    readonly filename: string;\n    constructor(filename: string = openAICodexAuthPath(), private readonly resolveSessionId?: () => string | undefined);\n    async listProfiles(): Promise<readonly CodexProfileSummary[]>;\n    async activeProfileId(): Promise<string | undefined>;\n    async addProfile(labelInput: string, credentialInput: OAuthCredential): Promise<CodexProfileSummary>;\n    async setActiveProfile(profileId: string): Promise<void>;\n    async renameProfile(profileId: string, labelInput: string): Promise<void>;\n    async removeProfile(profileId: string): Promise<void>;\n    forProfile(profileId: string): CredentialStore;\n    async readProfileCredential(profileId: string): Promise<OAuthCredential | undefined>;\n    async modifyProfileCredential(profileId: string, fn: (current: Credential | undefined) => Promise<Credential | undefined>): Promise<Credential | undefined>;\n    async read(providerId: string): Promise<Credential | undefined>;\n    async list(): Promise<readonly CredentialInfo[]>;\n    async modify(providerId: string, fn: (current: Credential | undefined) => Promise<Credential | undefined>): Promise<Credential | undefined>;\n    async delete(providerId: string): Promise<void>;\n}',
+  },
+  {
+    name: 'OpenAICodexCredits',
+    declaration: 'export interface OpenAICodexCredits {\n    readonly unlimited: boolean;\n    readonly balance?: string;\n}',
+  },
+  {
+    name: 'OpenAICodexIndividualLimit',
+    declaration: 'export interface OpenAICodexIndividualLimit {\n    readonly limit: string;\n    readonly used: string;\n    readonly remaining: string;\n    readonly remainingPercent: number;\n}',
+  },
+  {
+    name: 'OpenAICodexRateLimit',
+    declaration: 'export interface OpenAICodexRateLimit {\n    readonly id: string;\n    readonly name?: string;\n    readonly windows: readonly OpenAICodexRateLimitWindow[];\n}',
+  },
+  {
+    name: 'OpenAICodexRateLimitWindow',
+    declaration: 'export interface OpenAICodexRateLimitWindow {\n    readonly remainingPercent: number;\n    readonly windowSeconds: number;\n}',
+  },
+  {
+    name: 'OpenAICodexUsage',
+    declaration: 'export interface OpenAICodexUsage {\n    readonly rateLimits: readonly OpenAICodexRateLimit[];\n    readonly credits?: OpenAICodexCredits;\n    readonly individualLimit?: OpenAICodexIndividualLimit;\n}',
+  },
+  {
     name: 'PermissionSelect',
     declaration: 'export interface PermissionSelect {\n    options: PresetOption[];\n    currentValue: string;\n}',
   },
@@ -3616,6 +3724,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResolvedSubagentStartRequest',
     declaration: 'export interface ResolvedSubagentStartRequest extends SubagentStartRequest {\n    readonly descriptor: SubagentDescriptorData;\n}',
+  },
+  {
+    name: 'ResponseApiPreferences',
+    declaration: 'export interface ResponseApiPreferences {\n    useFastMode: boolean;\n    useWebSocketContextReuse: boolean;\n    useNativeCompaction: boolean;\n}',
   },
   {
     name: 'RestoredSessionOptions',

@@ -942,3 +942,14 @@ Source: [`packages/core/session/src/types.ts:264`](../packages/core/session/src/
 ```
 
 Source: [`packages/web/web-search-deepseek/src/provider.ts:83`](../packages/web/web-search-deepseek/src/provider.ts)
+
+<a id="webopenai-codex-search-llm-request--log-only"></a>
+
+#### `web/openai-codex-search-llm-request` — log-only
+
+```ts persistence-catalog
+/** Exact secret-free OpenAI Codex standalone-search request. */
+'web/openai-codex-search-llm-request': OpenAICodexSearchRequestRecord
+```
+
+Source: [`packages/bundle/dsh-codex_shared_pool/src/search-event.ts:14`](../packages/bundle/dsh-codex_shared_pool/src/search-event.ts)

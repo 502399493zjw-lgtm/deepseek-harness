@@ -25,3 +25,4 @@
 ## Known Limitations and Deferred Work
 
 - **只展示主窗口** — 侧边栏只汇总官方 Codex 主限额窗口，不展示次级窗口和 credits 余额。
+- **账号来源保持显式** — 与设置页相同的 `name`、`email` 展示优先级应用于每个 `accountHomes` 凭据。单独配置的设置页 profile 可能代表另一个账号，因此可以显示不同标签。

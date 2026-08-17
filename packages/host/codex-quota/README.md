@@ -25,3 +25,4 @@ The package does not alter model requests or reusable prompt prefixes.
 ## Known Limitations and Deferred Work
 
 - **Primary window only** — the sidebar intentionally summarizes the official primary Codex rate-limit window; secondary windows and credit balances are not displayed.
+- **Account source remains explicit** — the Settings-compatible `name`, then `email`, precedence applies to each configured `accountHomes` credential. An independently configured Settings profile can represent a different account and therefore show a different label.

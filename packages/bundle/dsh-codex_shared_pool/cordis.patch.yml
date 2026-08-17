@@ -1,9 +1,16 @@
 # The dsh-codex_shared_pool bundle is the single public composition boundary
-# for the DSH Codex integration. It rides over the generic Web bundle.
+# for the DSH Codex integration. It rides over the generic Web bundle. A saved
+# agent-default-model selection still wins over this bundle value.
+
+- id: agent-default-model
+  config:
+    provider: openai-codex
+    model: gpt-5.6-sol
+
+- id: web
+  config:
+    searchProvider: openai-codex
 
 - insert:
-    - id: codex-quota
-      name: '@deepseek-ai/dsh-host-codex-quota'
-
-    - id: ui-codex-quota
-      name: '@deepseek-ai/dsh-client-ui-codex-quota'
+    - id: codex-shared-pool
+      name: '@deepseek-ai/dsh-codex_shared_pool'

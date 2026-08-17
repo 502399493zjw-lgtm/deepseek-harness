@@ -75,6 +75,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   llm: 'llm-streaming.md',
   lsp: 'lsp.md',
   messageFeedback: 'feedback.md',
+  openAICodex: 'llm-streaming.md',
   permissionPresets: 'permission-presets.md',
   planMode: 'plan.md',
   terminals: 'terminal.md',
@@ -239,6 +240,10 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   LlmModelInfo: 'llm-streaming.md',
   LlmProviderInfo: 'llm-streaming.md',
   LlmConfigurableProvider: 'llm-streaming.md',
+  ImageToolPreferences: 'llm-streaming.md',
+  OpenAICodexAuthStatus: 'llm-streaming.md',
+  OpenAICodexUsage: 'llm-streaming.md',
+  ResponseApiPreferences: 'llm-streaming.md',
   LlmModelDiscoveryRequest: 'llm-streaming.md',
   LlmDiscoveredModel: 'llm-streaming.md',
   ResolvedRetryPolicy: 'llm-streaming.md',
@@ -507,6 +512,7 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
 /** Project types deliberately documented outside the subsystems catalog. */
 export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   z: 'schemastery schema constructor is owned by vendor/schemastery (vendored upstream)',
+  AuthInteraction: 'external pi-ai authentication interaction is owned by @earendil-works/pi-ai',
   BeginCommandRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
   InsertReferenceRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
   ConsumeTokenRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',

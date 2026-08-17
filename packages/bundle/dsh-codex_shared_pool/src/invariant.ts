@@ -1,5 +1,5 @@
 /**
- * Package-owned invariant companion for `@deepseek-ai/dsh-codex_shared_pool`.
+ * Package-owned invariant companion for `dsh-codex_shared_pool`.
  * @module @deepseek-ai/dsh-codex_shared_pool/invariant
  */
 
@@ -9,12 +9,14 @@ import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 const PACKAGE_NAME = '@deepseek-ai/dsh-codex_shared_pool'
 
 /** Cordis companion plugin name. */
-export const name = 'codex-shared-pool-bundle-invariant'
+export const name = 'dsh-codex-shared-pool-invariant'
 /** Service required before the companion can register. */
 export const inject = ['invariants']
 
-// No runtime invariant: this package is a static patch-list carrier. The Host
-// and browser packages own the mutable relationships introduced by its rows.
+// No runtime invariant: the LLM and web registries own provider uniqueness and disposal,
+// while credentials and model replies cross file/network boundaries whose
+// validation runs in their owning operations. There is no separate mutable
+// package relationship to scan.
 const install: InvariantInstaller = () => {}
 
 /**

@@ -1,6 +1,6 @@
 /** Display-safe Codex quota projection returned to browser clients. */
 export interface CodexQuotaSnapshot {
-  /** ChatGPT email or a non-secret account-kind fallback for the active account. */
+  /** Settings-compatible ChatGPT name or email, or a non-secret account-kind fallback. */
   readonly currentAccountName: string | null
   /** Remaining share of the active account's primary Codex window, from 0 to 100. */
   readonly currentRemainingPercent: number | null

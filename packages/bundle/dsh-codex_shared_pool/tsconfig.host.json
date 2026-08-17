@@ -1,0 +1,29 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
+  },
+  "include": ["src"],
+  "exclude": ["src/client"],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" },
+    { "path": "../../attachment/attachment" },
+    { "path": "../../core/agent" },
+    { "path": "../../core/session" },
+    { "path": "../../core/tools" },
+    { "path": "../../fs/fs" },
+    { "path": "../../host/codex-quota" },
+    { "path": "../../host/webserver" },
+    { "path": "../../interaction/commands" },
+    { "path": "../../llm/llm" },
+    { "path": "../../llm/llm-pi-ai" },
+    { "path": "../../runtime-diagnostics/invariants" },
+    { "path": "../../settings/settings" },
+    { "path": "../../util/atomic-write" },
+    { "path": "../../util/home-paths" },
+    { "path": "../../web/web" }
+  ]
+}

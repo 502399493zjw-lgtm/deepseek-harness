@@ -52,7 +52,7 @@ describe('CodexQuotaFooter', () => {
     expect(rows[1]?.textContent).toBe('账号池 12 个账号 · 总剩余 61%')
 
     const blue = view.container.querySelectorAll(`.${css.quota}`)
-    expect([...blue].map(node => node.textContent)).toEqual(['73%', '61%'])
+    expect([...blue].map(node => node.textContent)).toEqual(['73%'])
     expect(view.container.querySelectorAll(`.${css.separator}`)).toHaveLength(3)
     const open = screen.getByRole('button', { name: '打开' })
     expect(rows[0]?.parentElement).toBe(open.parentElement)
