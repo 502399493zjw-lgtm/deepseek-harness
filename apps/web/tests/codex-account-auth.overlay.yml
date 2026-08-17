@@ -1,0 +1,12 @@
+# Mount the optional public Codex bundle without exposing ambient Codex homes
+# or launching a real app-server during the keyless browser scenario.
+- insert:
+    - id: codex-shared-pool
+      name: '@deepseek-ai/dsh-codex_shared_pool'
+      config:
+        quota:
+          accountHomes:
+            - .dsh-codex-web-e2e-home
+          codexCommand: __dsh_web_e2e_missing_codex__
+          requestTimeoutMs: 1000
+          disposeGraceMs: 100

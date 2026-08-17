@@ -102,9 +102,12 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
  * @returns the settings shell element tree.
  */
 export function SettingsRoot(props: SettingsRootComponentProps) {
-  const { wide, useSections, useOnboardingSteps, useSessions, renderSlot } = props
+  const {
+    wide, useSections, useOnboardingSteps, useNavigationRequest, useSessions, renderSlot,
+  } = props
   const [open, setOpen] = useState(false)
   const [activeId, setActiveId] = useState<string | undefined>(undefined)
+  const handledNavigationRevision = useRef(0)
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
   const close = useCallback(() => {
     setOpen(false)
@@ -120,6 +123,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
   // seats re-render through their own outlets' subscriptions.
   const rows = useSections(s => s)
   const onboardingSteps = useOnboardingSteps(s => s)
+  const navigationRequest = useNavigationRequest(s => s)
   const onboardingActive = useSessions(state =>
     state.phase === 'ready'
     && (state.current === undefined || state.byId[state.current]?.blank === true))
@@ -131,6 +135,15 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
     if (onboardingActive) return
     setCompletedOnboarding(new Set())
   }, [onboardingActive])
+
+  useEffect(() => {
+    if (navigationRequest.revision === handledNavigationRevision.current) return
+    if (navigationRequest.sectionId === undefined) return
+    if (!rows.some(row => row.id === navigationRequest.sectionId)) return
+    handledNavigationRevision.current = navigationRequest.revision
+    setActiveId(navigationRequest.sectionId)
+    setOpen(true)
+  }, [navigationRequest, rows])
 
   const completeOnboardingStep = useCallback((id: string) => {
     setCompletedOnboarding((previous) => {

@@ -1,0 +1,16 @@
+- region "ChatGPT 账号":
+  - heading "ChatGPT 账号" [level=2]
+  - paragraph: 使用你的 ChatGPT 订阅即可调用 Codex，无需 API Key 或额外配置。
+  - complementary "ChatGPT 账号":
+    - heading "账号 (0)" [level=3]
+    - button "添加账号":
+      - img
+      - text: 添加账号
+  - status:
+    - strong: 尚未登录
+  - paragraph: 授权窗口已关闭，未添加账号。你可以重新尝试。
+  - button "网络与高级设置 代理与 3 项可选功能":
+    - img
+    - strong: 网络与高级设置
+    - text: 代理与 3 项可选功能
+    - img

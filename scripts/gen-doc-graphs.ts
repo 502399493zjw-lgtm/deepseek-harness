@@ -115,6 +115,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Adapters register provider implementations; the loop and compaction call the provider-neutral stream service.',
   },
   {
+    key: 'openAICodex',
+    pkg: 'dsh-codex_shared_pool',
+    title: 'Codex product composition service',
+    mode: 'bundle',
+    note: 'Owns one credential and preference state for the bundle\'s model adapter, browser routes, quota child, and terminal command front doors.',
+  },
+  {
     key: 'tokenMeter',
     pkg: 'token-meter',
     title: 'Replay token measurement',

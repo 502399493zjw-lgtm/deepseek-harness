@@ -2,6 +2,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import { apply as applySettingsBase } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject } from '../src/client/index.ts'
 import type { SettingsRootInjected } from '../src/client/shell-contract.ts'
 import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
@@ -9,6 +10,7 @@ import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
 async function bench() {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
+  await ctx.plugin({ apply: applySettingsBase }).await()
   // Copy machinery the shell only reads a revision from; the real locale
   // plugin would drag its own settings-row dependencies into this bench.
   ctx.provide('locale', {
@@ -49,7 +51,7 @@ const CHILD_SPECS = {
 
 describe('ui-settings apply', () => {
   it('declares only the slot registry (a pure composition face, no locale)', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'settingsNavigation'])
   })
 
   it('registers the shell and declares every child slot, before or after the declaration', async () => {
