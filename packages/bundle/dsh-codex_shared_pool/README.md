@@ -58,7 +58,7 @@ When `quota.accountHomes` is empty, the Host reads `DSH_CODEX_ACCOUNT_HOMES` usi
 
 Open **Settings → OpenAI Codex** to add, select, or remove DSH-owned ChatGPT OAuth profiles and inspect each profile's live Codex limits. Closing the authorization window cancels only the pending login, keeps stored profiles unchanged, and makes **Add account** available again. Account labels use the OAuth profile `name`, then `email`. DSH credentials live in the Harness home and are independent from Codex CLI/Desktop credentials.
 
-The sidebar's first line shows the current official Codex-home account label, remaining primary-window percentage, and reset time. Its second, lighter line shows the configured account count and mean remaining percentage. Only the current-account percentage is blue. The block is hidden in the collapsed rail and its arrow opens **OpenAI Codex** without covering sidebar content.
+The sidebar's first line shows the current official Codex-home account label, remaining primary-window percentage, and reset instant in the browser's local time zone using the fixed `M月D HH:mm` format, for example `8月17 15:54`. Month and day are unpadded; hour and minute use two digits. Its second, lighter line shows the configured account count and mean remaining percentage. Only the current-account percentage is blue. The block is hidden in the collapsed rail and its arrow opens **OpenAI Codex** without covering sidebar content.
 
 ## Security and failure behavior
 

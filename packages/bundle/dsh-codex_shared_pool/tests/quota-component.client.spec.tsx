@@ -106,6 +106,12 @@ describe('unified Codex quota footer', () => {
     expect(screen.getByRole('button', { name: '打开' })).toBeTruthy()
   })
 
+  it('formats reset instants as local unpadded month and day with padded time', () => {
+    const epochMs = new Date(2026, 7, 17, 5, 4).getTime()
+
+    expect(formatCodexResetTime(epochMs)).toBe('8月17 05:04')
+  })
+
   it('formats a known reset time and renders an unknown pool percentage neutrally', async () => {
     const read = vi.fn().mockResolvedValue({
       ...SNAPSHOT,

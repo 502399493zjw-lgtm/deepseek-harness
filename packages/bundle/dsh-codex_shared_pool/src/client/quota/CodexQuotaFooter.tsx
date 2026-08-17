@@ -25,13 +25,19 @@ export type CodexQuotaFooterProps =
   & InjectFace<CodexQuotaFooterFace>
   & PropsLocale<'codex.quota'>
 
-/** Format one reset instant in the browser's local time. */
+/**
+ * Format one reset instant as `M月D HH:mm` in the browser's local time zone.
+ *
+ * @param epochMs Reset instant in Unix epoch milliseconds.
+ * @returns Reset month and day without padding, followed by zero-padded 24-hour time.
+ */
 export function formatCodexResetTime(epochMs: number): string {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(epochMs))
+  const resetAt = new Date(epochMs)
+  const month = resetAt.getMonth() + 1
+  const day = resetAt.getDate()
+  const hour = String(resetAt.getHours()).padStart(2, '0')
+  const minute = String(resetAt.getMinutes()).padStart(2, '0')
+  return `${month}月${day} ${hour}:${minute}`
 }
 
 /** Render active-account and pool quota directly above sidebar bottom actions. */
