@@ -63,7 +63,6 @@
     { "path": "./packages/extensions/ui-cordis" },
     { "path": "./packages/test-support/client-runtime" },
     { "path": "./packages/client/ui-layout" },
-    { "path": "./packages/client/ui-codex-quota" },
     { "path": "./packages/bundle/dsh-codex_shared_pool/tsconfig.client.json" },
     { "path": "./packages/client/ui-sidebar" },
     { "path": "./packages/client/ui-conversation" },

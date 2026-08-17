@@ -1641,7 +1641,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'sidebar\' (client-ui-sidebar), so it exists while that entry is mounted',
     occupants: [
       'codex_shared_pool CodexQuotaFooter id \'codex-quota\'',
-      'client-ui-codex-quota CodexQuotaFooter id \'codex-quota\'',
       'client-ui-cordis CordisPanel id \'cordis-panel\'',
     ],
     replaceRisk: 'none',

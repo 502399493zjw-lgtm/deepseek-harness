@@ -110,6 +110,11 @@
         "zod"
       ]
     },
+    "packages/host/codex-quota": {
+      "ignoreDependencies": [
+        "zod"
+      ]
+    },
     "packages/host/directory-picker-native": {
       "entry": [
         "tests/**/*.spec.{ts,tsx}",
