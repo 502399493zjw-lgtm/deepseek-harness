@@ -63,4 +63,9 @@ describe('SidebarRoot.module.css', () => {
     expect(declarations('.collapsed .newSession')?.get('align-self')).toBe('flex-start')
     expect(declarations('.collapsed .newSession')?.get('width')).toBe('36px')
   })
+
+  it('stacks additive footer actions vertically above Settings', () => {
+    expect(declarations('.footArea')?.get('flex-direction')).toBe('column')
+    expect(css).toMatch(/\.footerActions\s*\{[^}]*flex-direction:\s*column;/)
+  })
 })

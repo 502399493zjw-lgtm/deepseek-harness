@@ -15,10 +15,10 @@ export const name = 'client-ui-settings-invariant'
 export const inject = ['invariants']
 
 /**
- * No runtime invariant: a presentation shell projecting the settings.section
- * ledger into navigation — it emits no cordis events and owns no cross-plugin
- * mutable relation; slot declaration/registration conflicts already fail loud
- * in the slot core at load time.
+ * No runtime invariant: the browser-only navigation store retains one latest
+ * viewing-state request, while scope binding and slot contributions own their
+ * lifecycles independently; no authoritative event/data relation exists to
+ * compare at runtime. Slot conflicts already fail loud in the slot core.
  */
 const install: InvariantInstaller = () => {}
 

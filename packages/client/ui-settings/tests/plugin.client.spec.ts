@@ -4,7 +4,7 @@
  * service retires with its fiber.
  */
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { apply, inject, SettingsScopeBinder } from '../src/client/index.ts'
 
 /** Boot the browser half over a bare root context; it injects nothing. */
@@ -20,10 +20,28 @@ describe('settings domain base plugin', () => {
     expect(ctx.get('settingsScope')).toBeInstanceOf(SettingsScopeBinder)
   })
 
+  it('publishes requested settings sections', async () => {
+    const { ctx, fiber } = bench()
+    await fiber.await()
+    const navigation = ctx.settingsNavigation
+    const listener = vi.fn()
+    const off = navigation.requests.subscribe(listener)
+
+    navigation.openSection('openai-codex')
+
+    expect(navigation.requests.getSnapshot()).toEqual({
+      revision: 1,
+      sectionId: 'openai-codex',
+    })
+    expect(listener).toHaveBeenCalledOnce()
+    off()
+  })
+
   it('fiber disposal retires the service', async () => {
     const { ctx, fiber } = bench()
     await fiber.await()
     await fiber.dispose()
     expect(ctx.get('settingsScope')).toBeUndefined()
+    expect(ctx.get('settingsNavigation')).toBeUndefined()
   })
 })

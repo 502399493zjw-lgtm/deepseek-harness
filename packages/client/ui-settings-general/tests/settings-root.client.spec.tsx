@@ -35,6 +35,8 @@ function mount({
   // plays a ledger change through the same observable contract.
   let current = rows
   const listeners = new Set<() => void>()
+  let navigationRequest = { revision: 0, sectionId: undefined as string | undefined }
+  const navigationListeners = new Set<() => void>()
   const renderSlot = vi.fn(
     ((key: string, _owner: unknown, opts?: { only?: string }) => {
       if (key === 'settings.section') return <div data-testid={`section-${opts?.only ?? 'all'}`} />
@@ -54,6 +56,15 @@ function mount({
     useWorkspaces: unusedHook,
     wide,
     useOnboardingSteps: select => select(steps),
+    useNavigationRequest: (select) => {
+      const [, force] = useState(0)
+      useEffect(() => {
+        const listener = () => { force(n => n + 1) }
+        navigationListeners.add(listener)
+        return () => { navigationListeners.delete(listener) }
+      }, [])
+      return select(navigationRequest)
+    },
     useSections: (select) => {
       const [, force] = useState(0)
       useEffect(() => {
@@ -72,7 +83,13 @@ function mount({
       for (const fn of [...listeners]) fn()
     })
   }
-  return { view, renderSlot, bump, listeners }
+  const navigate = (sectionId: string) => {
+    act(() => {
+      navigationRequest = { revision: navigationRequest.revision + 1, sectionId }
+      for (const fn of [...navigationListeners]) fn()
+    })
+  }
+  return { view, renderSlot, bump, navigate, listeners, navigationListeners }
 }
 
 function openPanel() {
@@ -162,6 +179,21 @@ describe('SettingsPanel close paths', () => {
 })
 
 describe('SettingsPanel navigation', () => {
+  it('opens directly on a requested registered section', () => {
+    const { navigate } = mount({
+      rows: [
+        { id: 'general', order: 0, label: 'General' },
+        { id: 'codex', order: 40, label: 'Codex' },
+      ],
+    })
+
+    navigate('codex')
+
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Codex' }).getAttribute('aria-current')).toBe('true')
+    expect(screen.getByTestId('section-codex')).toBeTruthy()
+  })
+
   it('projects rows, marks the first active, and renders only that section', () => {
     mount()
     openPanel()
@@ -261,9 +293,11 @@ describe('SettingsPanel navigation', () => {
   })
 
   it('drops the ledger subscription on unmount', () => {
-    const { view, listeners } = mount()
+    const { view, listeners, navigationListeners } = mount()
     expect(listeners.size).toBe(1)
+    expect(navigationListeners.size).toBe(1)
     view.unmount()
     expect(listeners.size).toBe(0)
+    expect(navigationListeners.size).toBe(0)
   })
 })

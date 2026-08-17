@@ -1,0 +1,9 @@
+# The dsh-codex_shared_pool bundle is the single public composition boundary
+# for the DSH Codex integration. It rides over the generic Web bundle.
+
+- insert:
+    - id: codex-quota
+      name: '@deepseek-ai/dsh-host-codex-quota'
+
+    - id: ui-codex-quota
+      name: '@deepseek-ai/dsh-client-ui-codex-quota'
