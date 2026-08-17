@@ -97,6 +97,12 @@ export interface CronTrigger {
   readonly description: string
   /** Five-field cron expression, numeric fields only. */
   readonly expr: string
+  /**
+   * IANA zone the expression runs in; omitted for UTC. Half-hour offsets fire
+   * at their exact local minute boundary, and zones with daylight saving
+   * shift matches with the offset.
+   */
+  readonly timezone?: string
 }
 
 /** A Duty woken only by an explicit human or model request. */

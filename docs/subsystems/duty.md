@@ -29,7 +29,7 @@ type DutyLifecycle = 'draft' | 'active' | 'paused' | 'archived'
 type DutyPauseReason = 'failures' | 'budget' | 'escalation' | 'human'
 ```
 
-The trigger vocabulary is closed: `manual` never fires on its own, `interval` sits on a grid anchored to creation (`createdAt + k·everyMs`, `k ≥ 1`), and `cron` is the five-field numeric subset with Vixie OR day semantics (0 and 7 both mean Sunday). The execution body is structured data bounded at the contract boundary: at most 30 steps, depth 5, parallel fan-out 8, per-run budget ≤ 20 USD, agent steps with prompts, and gated tools drawn from the allowance.
+The trigger vocabulary is closed: `manual` never fires on its own, `interval` sits on a grid anchored to creation (`createdAt + k·everyMs`, `k ≥ 1`), and `cron` is the five-field numeric subset with Vixie OR day semantics (0 and 7 both mean Sunday), matched in UTC unless the trigger names an IANA timezone, in which case day fields and the minute match follow that zone's local calendar and daylight-saving offsets. The execution body is structured data bounded at the contract boundary: at most 30 steps, depth 5, parallel fan-out 8, per-run budget ≤ 20 USD, agent steps with prompts, and gated tools drawn from the allowance.
 
 ## Runs and the single-run claim
 
@@ -297,11 +297,14 @@ verifierIds(): readonly string[]
 resolve(): DutyVerifier | undefined
 
 /**
- * Judge one reported completion through the configured verifier.
+ * Judge one reported completion through the configured or the named
+ * verifier.
  * @param request - the step, its summary, and the bounded evidence.
- * @returns the verdict; throws when the configured verifier is missing.
+ * @param verifierId - an explicit verifier id; absent, the configured
+ * default is selected.
+ * @returns the verdict; throws when the selected verifier is missing.
  */
-async verify(request: DutyVerificationRequest): Promise<DutyVerdict>
+async verify(request: DutyVerificationRequest, verifierId?: string): Promise<DutyVerdict>
 ```
 
 Source: [`packages/duty/duty-verify/src/index.ts:32`](../../packages/duty/duty-verify/src/index.ts)

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/duty/duty-trigger-timer/README.md
-README.md: 5780a6263b9a650a0c9704c14e6a1c6d4bbdfe1c
-README.zh.md: 48498133ecd603fc44f9e2744ea5bf0541908318
+README.md: a20854ba1c733116689f3592ead793f7e9ca0321
+README.zh.md: ea572306623a8072f9073b2b9a22e110cc0c5cde

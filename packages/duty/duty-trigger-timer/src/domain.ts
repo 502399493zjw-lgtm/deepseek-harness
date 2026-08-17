@@ -7,11 +7,11 @@
  */
 
 /**
- * Longest calendar search horizon in whole days. Four years cover every leap
- * day; a cron expression that matches no minute inside it (for example
- * February 30) can never wake a Duty and reports no occurrence.
+ * Longest calendar search horizon in whole days. Eight Gregorian years cover
+ * the exceptional 2096-to-2104 leap-day gap across the non-leap year 2100; a
+ * cron expression that matches no minute inside it reports no occurrence.
  */
-export const CRON_SEARCH_HORIZON_DAYS = 1461
+export const CRON_SEARCH_HORIZON_DAYS = 2922
 
 const MILLIS_PER_MINUTE = 60_000
 const MILLIS_PER_HOUR = 3_600_000
@@ -59,7 +59,11 @@ export interface CronRule {
 function expandField(field: string, min: number, max: number): Set<number> {
   const values = new Set<number>()
   for (const component of field.split(',')) {
+    if (!/^(?:\*|\d+(?:-\d+)?)(?:\/\d+)?$/u.test(component)) {
+      throw new CronRuleError(`cron component '${component}' is malformed in '${field}'`)
+    }
     const parts = component.split('/')
+    /* v8 ignore next -- the component regex requires a non-empty base. */
     const base = parts[0] ?? ''
     const stepText = parts[1]
     const step = stepText === undefined ? 1 : Number(stepText)
@@ -102,8 +106,10 @@ export function parseCron(expr: string): CronRule {
   }
   const expandAt = (index: number): Set<number> => {
     const bounds = FIELD_BOUNDS[index]
+    /* v8 ignore next -- callers use only the five FIELD_BOUNDS indices. */
     if (bounds === undefined) throw new CronRuleError(`cron field ${index} has no bounds`)
     const field = fields[index]
+    /* v8 ignore next -- the length check guarantees fields at indices 0..4. */
     if (field === undefined) throw new CronRuleError(`cron expression '${expr}' must have five fields`)
     return expandField(field, bounds.min, bounds.max)
   }
@@ -139,15 +145,105 @@ function dayMatches(rule: CronRule, month: number, dom: number, dow: number): bo
 }
 
 /**
+ * Whether the rule's restricted day-of-month can exist in one admitted month.
+ * A restricted weekday makes the rule satisfiable through Vixie OR semantics,
+ * and year 2000 supplies February's maximum Gregorian length for the lookup.
+ */
+function calendarDayPossible(rule: CronRule): boolean {
+  if (!rule.domRestricted || rule.dowRestricted) return true
+  for (const month of rule.month) {
+    const maxDom = new Date(Date.UTC(2000, month, 0)).getUTCDate()
+    for (const dom of rule.dom) {
+      if (dom <= maxDom) return true
+    }
+  }
+  return false
+}
+
+/** One zone-local calendar reading of an instant. */
+interface ZoneFields {
+  readonly year: number
+  readonly month: number
+  readonly day: number
+  readonly hour: number
+  readonly minute: number
+}
+
+/** One cached formatter per zone, reused across the search. */
+const formatterCache = new Map<string, Intl.DateTimeFormat>()
+
+/** Resolve one formatter for an IANA zone. */
+function formatterFor(timeZone: string): Intl.DateTimeFormat {
+  const cached = formatterCache.get(timeZone)
+  if (cached !== undefined) return cached
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+  formatterCache.set(timeZone, formatter)
+  return formatter
+}
+
+/**
+ * Read one instant's zone-local calendar fields. Every part the formatter was
+ * configured with is always emitted by `formatToParts`, so missing parts are
+ * `NaN` and can never match a rule; there is no fallback to misread.
+ */
+function zoneFields(epochMs: number, timeZone: string): ZoneFields {
+  const values: Record<string, string> = Object.fromEntries(
+    formatterFor(timeZone).formatToParts(new Date(epochMs)).map(part => [part.type, part.value]),
+  )
+  return {
+    year: Number(values['year']),
+    month: Number(values['month']),
+    day: Number(values['day']),
+    hour: Number(values['hour']),
+    minute: Number(values['minute']),
+  }
+}
+
+/**
+ * The day of week of one zone-local date, with 0 = Sunday. The day count
+ * since the epoch is offset by 4 because 1970-01-01 was a Thursday; the
+ * double modulo keeps the value in 0..6 for every non-negative year.
+ */
+function dayOfWeekOf(year: number, month: number, day: number): number {
+  const days = Math.floor(Date.UTC(year, month - 1, day) / MILLIS_PER_DAY)
+  return ((days + 4) % 7 + 7) % 7
+}
+
+/**
+ * Whether one zone-local date row passes the parsed day rule. The day of week
+ * derives from the row's own calendar date, so a local weekday that starts
+ * before the UTC midnight of the same date still counts as the local day.
+ */
+function zonedDayMatches(rule: CronRule, fields: ZoneFields): boolean {
+  return dayMatches(rule, fields.month, fields.day, dayOfWeekOf(fields.year, fields.month, fields.day))
+}
+
+/**
  * Find the first minute-aligned match at or after the start of the minute
  * holding `from`.
  * @param expr - Five-field numeric cron expression.
  * @param from - Any epoch-millisecond instant.
+ * @param timeZone - IANA zone for local-time matching; omitted for UTC.
  * @returns the matching minute start in epoch milliseconds, or `undefined`
  * when no minute matches within {@link CRON_SEARCH_HORIZON_DAYS}.
  */
-export function nextCronMatch(expr: string, from: number): number | undefined {
+export function nextCronMatch(expr: string, from: number, timeZone?: string): number | undefined {
   const rule = parseCron(expr)
+  if (!calendarDayPossible(rule)) return undefined
+  if (timeZone === undefined) return nextUtcMatch(rule, from)
+  return nextZonedMatch(rule, from, timeZone)
+}
+
+/** The UTC branch: match at the start of the minute holding `from`. */
+function nextUtcMatch(rule: CronRule, from: number): number | undefined {
   const current = new Date(from)
   const currentDay = Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate())
   for (let dayOffset = 0; dayOffset <= CRON_SEARCH_HORIZON_DAYS; dayOffset += 1) {
@@ -166,6 +262,44 @@ export function nextCronMatch(expr: string, from: number): number | undefined {
       }
     }
   }
+  /* v8 ignore next -- every satisfiable five-field rule recurs inside the eight-year horizon. */
+  return undefined
+}
+
+/**
+ * The zone branch. Zone offsets are whole minutes, so zone-local minute
+ * boundaries align with UTC minute boundaries and each candidate is checked
+ * with one formatter reading. A UTC day is pruned by its zone-local dates at
+ * the start, middle, and end: three local dates is the most a 24-hour UTC
+ * window can hold (consecutive local days span at least 23 hours), and the
+ * middle probe always lands on the middle date. Matching days are scanned one
+ * minute at a time: a zone-local day spans at most 25 UTC hours across the
+ * fall-back transition, so 25 * 60 + 2 covers every minute. On fall-back the
+ * repeated local hour matches twice, once per UTC pass, as Vixie cron fires.
+ */
+function nextZonedMatch(rule: CronRule, from: number, timeZone: string): number | undefined {
+  const current = new Date(from)
+  const currentDay = Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate())
+  for (let dayOffset = 0; dayOffset <= CRON_SEARCH_HORIZON_DAYS; dayOffset += 1) {
+    const dayStart = currentDay + dayOffset * MILLIS_PER_DAY
+    const dayEnd = dayStart + MILLIS_PER_DAY - 1
+    const startFields = zoneFields(dayStart, timeZone)
+    const middleFields = zoneFields(dayStart + MILLIS_PER_DAY / 2, timeZone)
+    const endFields = zoneFields(dayEnd, timeZone)
+    const startMatches = zonedDayMatches(rule, startFields)
+    const middleMatches = zonedDayMatches(rule, middleFields)
+    const endMatches = zonedDayMatches(rule, endFields)
+    if (!startMatches && !middleMatches && !endMatches) continue
+    for (let minute = 0; minute <= 25 * 60 + 2; minute += 1) {
+      const start = dayStart + minute * MILLIS_PER_MINUTE
+      if (start + MILLIS_PER_MINUTE <= from) continue
+      const fields = zoneFields(start, timeZone)
+      if (!zonedDayMatches(rule, fields)) continue
+      if (!rule.hour.has(fields.hour) || !rule.minute.has(fields.minute)) continue
+      return start
+    }
+  }
+  /* v8 ignore next -- every satisfiable five-field rule recurs inside the eight-year horizon. */
   return undefined
 }
 
@@ -223,16 +357,18 @@ export interface CronOccurrence {
  * which advances past all missed matches without replaying them.
  * @param expr - Five-field numeric cron expression.
  * @param now - The current wall-clock instant in epoch milliseconds.
+ * @param timeZone - IANA zone for local-time matching; omitted for UTC.
  * @returns the resolved occurrence; `nextWakeAt` is absent when no further
  * minute matches within the search horizon.
  */
-export function resolveCronOccurrence(expr: string, now: number): CronOccurrence {
-  const occurrenceAt = nextCronMatch(expr, now)
+export function resolveCronOccurrence(expr: string, now: number, timeZone?: string): CronOccurrence {
+  const occurrenceAt = nextCronMatch(expr, now, timeZone)
   if (occurrenceAt === undefined) return { due: false }
-  const next = nextCronMatch(expr, occurrenceAt + MILLIS_PER_MINUTE)
+  const next = nextCronMatch(expr, occurrenceAt + MILLIS_PER_MINUTE, timeZone)
   return {
     occurrenceAt,
     due: occurrenceAt <= now,
+    /* v8 ignore next -- a matching rule always recurs inside the same eight-year horizon. */
     ...(next === undefined ? {} : { nextWakeAt: next }),
   }
 }

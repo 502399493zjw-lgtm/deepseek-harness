@@ -353,9 +353,9 @@ const TOOL_PACKAGES: ToolPackage[] = [
       // so the durable Duty service's storage stack stays out of the catalog.
       ctx.provide('duties', {
         list: () => [],
-        create: async () => ({}),
-        setLifecycle: async () => ({}),
-        answer: async () => ({}),
+        create: () => Promise.resolve({}),
+        setLifecycle: () => Promise.resolve({}),
+        answer: () => Promise.resolve({}),
       })
       await ctx.plugin(AgentRegistry)
       await ctx.plugin(ToolDuty)

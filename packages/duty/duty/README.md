@@ -39,7 +39,7 @@ Every mutation that must not interleave runs through the domain write chain. Rec
 
 ## Contract bounds
 
-The schemas in `src/spec.ts` enforce the execution-body limits and the trigger vocabulary: at most 30 steps, depth 5, parallel fan-out 8, per-run budget ≤ USD 20, interval periods of at least one minute, five-field numeric cron expressions, gated tools drawn from the allowance, an agent step with a prompt and no children, and a group step with children. A contract violating any of these fails `create` and `edit` with `DutyError('invalid-contract')`.
+The schemas in `src/spec.ts` enforce the execution-body limits and the trigger vocabulary: at most 30 steps, depth 5, parallel fan-out 8, per-run budget ≤ USD 20, interval periods of at least one minute, five-field numeric cron expressions, an optional IANA timezone on cron triggers, gated tools drawn from the allowance, an agent step with a prompt and no children, and a group step with children. A contract violating any of these fails `create` and `edit` with `DutyError('invalid-contract')`.
 
 ## Service errors
 

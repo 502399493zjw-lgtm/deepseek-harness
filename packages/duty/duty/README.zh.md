@@ -41,7 +41,7 @@ DeepSeek Harness 的持久化职责合约。该包注册 `ctx.duties`,持久化 
 
 ## 合约边界
 
-`src/spec.ts` 中的 schema 强制执行 body 限制与触发词表:最多 30 步、深度 5、parallel 扇出 8、单 run 预算 ≤ 20 美元、interval 周期至少一分钟、五段数值 cron、gated 工具取自 allow、agent 步骤带 prompt 且无子节点、组合步骤必须有子节点。违反任一条的合约在 `create`/`edit` 中以 `DutyError('invalid-contract')` 拒绝。
+`src/spec.ts` 中的 schema 强制执行 body 限制与触发词表:最多 30 步、深度 5、parallel 扇出 8、单 run 预算 ≤ 20 美元、interval 周期至少一分钟、五段数值 cron、cron 触发可选的 IANA 时区、gated 工具取自 allow、agent 步骤带 prompt 且无子节点、组合步骤必须有子节点。违反任一条的合约在 `create`/`edit` 中以 `DutyError('invalid-contract')` 拒绝。
 
 ## 模型体验
 

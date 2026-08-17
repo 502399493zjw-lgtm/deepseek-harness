@@ -29,7 +29,7 @@ type DutyLifecycle = 'draft' | 'active' | 'paused' | 'archived'
 type DutyPauseReason = 'failures' | 'budget' | 'escalation' | 'human'
 ```
 
-触发词表是封闭的:`manual` 从不自行触发,`interval` 锚定在创建时间上的网格(`createdAt + k·everyMs`,`k ≥ 1`),`cron` 是五段数值子集、Vixie OR 日期语义(0 与 7 都表示周日)。执行 body 是结构化数据,在合约边界设限:最多 30 步、深度 5、parallel 扇出 8、单 run 预算 ≤ 20 美元、agent 步骤必须有 prompt、gated 工具必须是 allow 的子集。
+触发词表是封闭的:`manual` 从不自行触发,`interval` 锚定在创建时间上的网格(`createdAt + k·everyMs`,`k ≥ 1`),`cron` 是五段数值子集、Vixie OR 日期语义(0 与 7 都表示周日),默认按 UTC 匹配;若触发命名了 IANA 时区,日期字段与分钟匹配则跟随该时区的本地日历与夏令时偏移。执行 body 是结构化数据,在合约边界设限:最多 30 步、深度 5、parallel 扇出 8、单 run 预算 ≤ 20 美元、agent 步骤必须有 prompt、gated 工具必须是 allow 的子集。
 
 ## run 与单 run claim
 
@@ -297,11 +297,14 @@ verifierIds(): readonly string[]
 resolve(): DutyVerifier | undefined
 
 /**
- * Judge one reported completion through the configured verifier.
+ * Judge one reported completion through the configured or the named
+ * verifier.
  * @param request - the step, its summary, and the bounded evidence.
- * @returns the verdict; throws when the configured verifier is missing.
+ * @param verifierId - an explicit verifier id; absent, the configured
+ * default is selected.
+ * @returns the verdict; throws when the selected verifier is missing.
  */
-async verify(request: DutyVerificationRequest): Promise<DutyVerdict>
+async verify(request: DutyVerificationRequest, verifierId?: string): Promise<DutyVerdict>
 ```
 
 Source: [`packages/duty/duty-verify/src/index.ts:32`](../../packages/duty/duty-verify/src/index.ts)

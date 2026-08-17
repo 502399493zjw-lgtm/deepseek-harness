@@ -709,10 +709,10 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the selected checker, or `undefined` when nothing is registered under the configured id.',
       },
       {
-        signature: 'async verify(request: DutyVerificationRequest): Promise<DutyVerdict>',
-        description: 'Judge one reported completion through the configured verifier.',
-        parameters: [{ name: 'request', description: 'the step, its summary, and the bounded evidence.' }],
-        returns: 'the verdict; throws when the configured verifier is missing.',
+        signature: 'async verify(request: DutyVerificationRequest, verifierId?: string): Promise<DutyVerdict>',
+        description: 'Judge one reported completion through the configured or the named verifier.',
+        parameters: [{ name: 'request', description: 'the step, its summary, and the bounded evidence.' }, { name: 'verifierId', description: 'an explicit verifier id; absent, the configured default is selected.' }],
+        returns: 'the verdict; throws when the selected verifier is missing.',
       },
     ],
   },
@@ -3121,7 +3121,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CronTrigger',
-    declaration: 'export interface CronTrigger {\n    readonly kind: \'cron\';\n    readonly description: string;\n    readonly expr: string;\n}',
+    declaration: 'export interface CronTrigger {\n    readonly kind: \'cron\';\n    readonly description: string;\n    readonly expr: string;\n    readonly timezone?: string;\n}',
   },
   {
     name: 'DiffCallView',
@@ -3301,7 +3301,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DutyVerification',
-    declaration: 'export type DutyVerification = \'off\' | \'on\';',
+    declaration: 'export type DutyVerification = \'off\' | \'on\' | (string & {});',
   },
   {
     name: 'DutyVerificationEvidence',

@@ -999,7 +999,7 @@ Create one Duty in draft from a complete contract: title, goal, trigger, executi
       "description": "What the Duty must not do."
     },
     "trigger": {
-      "description": "kind manual | interval (everyMs >= 60000) | cron (five numeric fields), plus a description."
+      "description": "kind manual | interval (everyMs >= 60000) | cron (five numeric fields, optional timezone as an IANA name, UTC when omitted), plus a description."
     },
     "verification": {
       "type": "string",

@@ -466,6 +466,41 @@ describe('duty service', () => {
       }))).rejects.toMatchObject({ code: 'invalid-contract' })
     })
 
+    it('rejects malformed cron components', async () => {
+      await expect(harness.duties.create(createRequest({
+        trigger: {
+          kind: 'cron',
+          description: 'broken range',
+          expr: '*-2 9 * * *',
+        },
+      }))).rejects.toMatchObject({ code: 'invalid-contract' })
+    })
+
+    it('rejects a cron timezone that is not an IANA name', async () => {
+      await expect(harness.duties.create(createRequest({
+        trigger: {
+          kind: 'cron',
+          description: 'every morning',
+          expr: '0 9 * * *',
+          timezone: 'Mars/Olympus',
+        },
+      }))).rejects.toMatchObject({ code: 'invalid-contract' })
+    })
+
+    it('accepts a cron rule with a valid IANA timezone', async () => {
+      const view = await harness.duties.create(createRequest({
+        trigger: {
+          kind: 'cron',
+          description: 'every morning',
+          expr: '0 9 * * *',
+          timezone: 'Asia/Shanghai',
+        },
+      }))
+      const trigger = view.spec.trigger
+      expect(trigger.kind).toBe('cron')
+      if (trigger.kind === 'cron') expect(trigger.timezone).toBe('Asia/Shanghai')
+    })
+
     it('accepts a body at the nesting limit', async () => {
       const view = await harness.duties.create(createRequest({
         body: {

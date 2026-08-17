@@ -11,7 +11,7 @@ import type {} from '@deepseek-ai/dsh-agent'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { DutyError, DutyId, HumanRequestId } from '@deepseek-ai/dsh-duty'
-import type { DutyLifecycle, DutyPauseReason, DutyVerification } from '@deepseek-ai/dsh-duty'
+import type { DutyLifecycle, DutyPauseReason } from '@deepseek-ai/dsh-duty'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'tool-duty'
@@ -83,7 +83,7 @@ export function apply(ctx: Context): void {
       trigger: {
         type: 'json',
         required: true,
-        description: 'kind manual | interval (everyMs >= 60000) | cron (five numeric fields), plus a description.',
+        description: 'kind manual | interval (everyMs >= 60000) | cron (five numeric fields, optional timezone as an IANA name, UTC when omitted), plus a description.',
       },
       verification: {
         type: 'string',
@@ -137,7 +137,7 @@ export function apply(ctx: Context): void {
           goal: input.goal,
           ...(input.scope === undefined ? {} : { scope: input.scope }),
           trigger: input.trigger as Parameters<typeof ctx.duties.create>[0]['trigger'],
-          ...(input.verification === undefined ? {} : { verification: input.verification as DutyVerification }),
+          ...(input.verification === undefined ? {} : { verification: input.verification }),
           body: input.body as Parameters<typeof ctx.duties.create>[0]['body'],
           toolPolicy: input.tool_policy,
           ...(input.limits === undefined ? {} : { limits: input.limits }),

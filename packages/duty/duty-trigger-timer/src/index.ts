@@ -44,6 +44,7 @@ export const Config: s<Config> = s.object({})
 
 /** Render an unknown rule failure for process-local diagnostics only. */
 function renderThrown(value: unknown): string {
+  /* v8 ignore next -- both owned occurrence resolvers throw Error subclasses. */
   return value instanceof Error ? value.message : String(value)
 }
 
@@ -85,7 +86,7 @@ export class TimerDutyTriggerProvider implements DutyTriggerProvider {
       try {
         decision = spec.trigger.kind === 'interval'
           ? resolveIntervalOccurrence(spec.createdAt, spec.trigger.everyMs, now)
-          : resolveCronOccurrence(spec.trigger.expr, now)
+          : resolveCronOccurrence(spec.trigger.expr, now, spec.trigger.timezone)
       } catch (error: unknown) {
         if (error instanceof CronRuleError) {
           this.ctx.logger.warn(
@@ -104,6 +105,7 @@ export class TimerDutyTriggerProvider implements DutyTriggerProvider {
         providerId: TIMER_PROVIDER_ID,
         cause: { kind: 'schedule', reason: spec.trigger.description },
         occurredAt: now,
+        /* v8 ignore next -- every owned occurrence resolver supplies a following wake. */
         ...(decision.nextWakeAt === undefined ? {} : { nextWakeAt: decision.nextWakeAt }),
       })
     }

@@ -78,6 +78,27 @@ describe('timer duty trigger provider', () => {
     expect(observations[0]?.cause.reason).toBe('at minute 45')
   })
 
+  it('reports a cron duty due at its zone-local minute', async () => {
+    // 09:00 in Shanghai (+08:00) is 01:00 UTC on the same date; the same
+    // rule without a timezone would not be due until 09:00 UTC.
+    const provider = new TimerDutyTriggerProvider(
+      ctxStub(),
+      dutiesStub([view({
+        trigger: {
+          kind: 'cron',
+          description: 'every morning in Shanghai',
+          expr: '0 9 * * *',
+          timezone: 'Asia/Shanghai',
+        },
+        createdAt: T0 - 86_400_000,
+      }, {})]),
+    )
+    const shanghaiNine = Date.UTC(2026, 0, 1, 1, 0)
+    const observations = await provider.poll(shanghaiNine)
+    expect(observations).toHaveLength(1)
+    expect(observations[0]?.cause.reason).toBe('every morning in Shanghai')
+  })
+
   it('skips a duty not yet due', async () => {
     const provider = new TimerDutyTriggerProvider(
       ctxStub(),
@@ -107,6 +128,8 @@ describe('timer duty trigger provider', () => {
       ctxStub(),
       dutiesStub([
         view({ mode: 'once', trigger: { kind: 'manual', description: 'asked' } }, {}),
+        // Defensive against a hand-edited record that contradicts derivation.
+        view({ mode: 'standing', trigger: { kind: 'manual', description: 'asked' } }, {}),
         view({}, { lifecycle: 'paused', pausedReason: 'human' }),
         view({}, { lifecycle: 'archived' }),
         view({}, { lifecycle: 'draft' }),
@@ -141,6 +164,24 @@ describe('timer duty trigger provider', () => {
     )
     expect(await provider.poll(NOW)).toHaveLength(0)
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('invalid cron rule'))
+  })
+
+  it('warns and skips a cron timezone that bypassed contract validation', async () => {
+    const warn = vi.fn()
+    const provider = new TimerDutyTriggerProvider(
+      ctxStub(warn),
+      dutiesStub([view({
+        trigger: {
+          kind: 'cron',
+          description: 'broken zone',
+          expr: '0 9 * * *',
+          timezone: 'Mars/Olympus',
+        },
+        createdAt: T0 - 86_400_000,
+      }, {})]),
+    )
+    expect(await provider.poll(NOW)).toHaveLength(0)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not resolve occurrence'))
   })
 })
 

@@ -38,9 +38,10 @@ const nonEmpty = z.string().refine(value => value.trim().length > 0, {
   message: 'value must contain a non-whitespace character',
 })
 
-/** Five numeric cron fields; ranges, lists, and steps over `*`. */
-const CRON_FIELD = String.raw`(\*|\d+)(-\d+)?(\/\d+)?(,(\*|\d+)(-\d+)?(\/\d+)?)*`
-const CRON_EXPR_RE = new RegExp(`^${CRON_FIELD}( ${CRON_FIELD}){4}$`)
+/** Five numeric cron fields; ranges, lists, and steps over values or `*`. */
+const CRON_ATOM = String.raw`(?:\*|\d+(?:-\d+)?)`
+const CRON_FIELD = String.raw`${CRON_ATOM}(?:\/\d+)?(?:,${CRON_ATOM}(?:\/\d+)?)*`
+const CRON_EXPR_RE = new RegExp(`^${CRON_FIELD}(?: ${CRON_FIELD}){4}$`)
 
 /** Inclusive value bounds per cron field, in expression order. */
 const CRON_FIELD_BOUNDS = [
@@ -50,6 +51,16 @@ const CRON_FIELD_BOUNDS = [
   [1, 12],   // month
   [0, 7],    // day of week; 0 and 7 both mean Sunday
 ] as const
+
+/** Whether one IANA timezone name resolves. */
+function isValidTimeZone(name: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: name })
+    return true
+  } catch (_invalidTimeZone) {
+    return false
+  }
+}
 
 /**
  * Whether every numeric literal in one cron field stays inside its bounds and
@@ -96,6 +107,9 @@ export const dutyTriggerSchema = z.discriminatedUnion('kind', [
       }), {
         message: 'cron expression names a value outside its field bounds',
       }),
+    timezone: z.string().refine(isValidTimeZone, {
+      message: 'cron timezone must be an IANA timezone name',
+    }).optional(),
   }),
 ])
 
