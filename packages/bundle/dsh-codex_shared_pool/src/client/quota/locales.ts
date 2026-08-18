@@ -3,6 +3,7 @@
 /** Simplified Chinese dictionary and key source of truth. */
 export const zh = {
   aria: 'Codex 额度',
+  account: 'Codex 账号：',
   remaining: '剩余',
   resetAt: '{time} 重置',
   resetUnknown: '重置时间未知',
@@ -20,6 +21,7 @@ export type CodexQuotaLocaleKey = keyof typeof zh
 /** English dictionary checked against the Chinese key set. */
 export const en = {
   aria: 'Codex quota',
+  account: 'Codex account: ',
   remaining: 'remaining',
   resetAt: 'resets {time}',
   resetUnknown: 'reset time unavailable',

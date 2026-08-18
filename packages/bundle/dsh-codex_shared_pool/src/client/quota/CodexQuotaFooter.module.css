@@ -16,18 +16,32 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 400;
   line-height: 22px;
 }
 
 .current,
+.accountLine,
 .pool,
 .status {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.accountLine {
+  display: flex;
+  align-items: baseline;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.accountLabel {
+  flex: none;
 }
 
 .current {
@@ -50,6 +64,7 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--dsw-alias-label-primary);
   font-weight: 500;
 }

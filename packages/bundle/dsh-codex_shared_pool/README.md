@@ -11,7 +11,7 @@ The provider supports multiple user-authorized ChatGPT accounts. The selected pr
 [`cordis.patch.yml`](cordis.patch.yml) contributes only `codex-shared-pool` with module name `@deepseek-ai/dsh-codex_shared_pool`. It selects `openai-codex` / `gpt-5.6-sol` for new agents and selects the Codex search provider; a saved model selection still takes precedence.
 
 - The Host entry owns OAuth profiles, model and search adapters, image-tool policy, browser auth routes, TUI commands, and the optional quota child capability.
-- The browser entry owns the `openai-codex` Settings section, model preferences, image-tool rendering, and the two-line quota block above the sidebar's bottom actions. The arrow action opens that same Settings section.
+- The browser entry owns the `openai-codex` Settings section, model preferences, image-tool rendering, and the three-line account and quota block above the sidebar's bottom actions. The arrow action opens that same Settings section.
 - [`packages/host/codex-quota`](../../host/codex-quota/README.md) reads official Codex homes through `codex app-server --stdio`, and [`packages/api/remotes`](../../api/remotes/README.md) carries its display-safe `codexQuota/read` result. Neither package receives an independent Loader row.
 
 The `dsh-openai-codex` executable provides `login`, `status`, and `logout` for terminal or headless installations. The TUI contribution exposes the same provider and `/codex status|login|logout|usage|config` command family without a second `/tui` plugin registration.
@@ -58,7 +58,7 @@ When `quota.accountHomes` is empty, the Host reads `DSH_CODEX_ACCOUNT_HOMES` usi
 
 Open **Settings → OpenAI Codex** to add, select, or remove DSH-owned ChatGPT OAuth profiles and inspect each profile's live Codex limits. Closing the authorization window cancels only the pending login, keeps stored profiles unchanged, and makes **Add account** available again. Account labels use the OAuth profile `name`, then `email`. DSH credentials live in the Harness home and are independent from Codex CLI/Desktop credentials.
 
-The sidebar's first line shows the current official Codex-home account label, remaining primary-window percentage, and reset instant in the browser's local time zone using the fixed `M月D HH:mm` format, for example `8月17 15:54`. Month and day are unpadded; hour and minute use two digits. Its second, lighter line shows the configured account count and mean remaining percentage. Only the current-account percentage is blue. The block is hidden in the collapsed rail and its arrow opens **OpenAI Codex** without covering sidebar content.
+The sidebar's first line identifies the current official Codex-home account as `Codex account: <label>`. Its second line shows the remaining primary-window percentage and reset instant in the browser's local time zone using the fixed `M月D HH:mm` format, for example `8月17 15:54`. Month and day are unpadded; hour and minute use two digits. Its third, lighter line shows the configured account count and mean remaining percentage. Only the current-account percentage is blue. The block is hidden in the collapsed rail and its arrow opens **OpenAI Codex** without covering sidebar content.
 
 ## Security and failure behavior
 
