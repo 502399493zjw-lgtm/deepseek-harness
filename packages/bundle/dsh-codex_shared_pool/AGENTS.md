@@ -12,18 +12,39 @@ This file supplements the root, package, and any closer `AGENTS.md`. Keep only p
 
 Do not create a second repository, bundle, public plugin, or copied implementation. Install new account-pool capabilities through this bundle even when an internal package owns the code.
 
-## Development flow
+## Delivery states
 
-Follow the [recorded workflow decision](../../../.agents/notes/implemented/process/2026-08-18-codex-shared-pool-development-flow.md).
+Follow the [recorded workflow decision](../../../.agents/notes/implemented/process/2026-08-18-codex-shared-pool-development-flow.md). Keep these evidence fields distinct and report every applicable one:
 
-1. Inspect the branch, `git status --short`, relevant diffs, current pull request, intended base, and `git worktree list`. Read the nearest instructions and identify the smallest owning package and focused evidence.
-2. Continue the current named task branch when it belongs to the request and has no conflicting work. Create a named task branch and isolated Codex-managed worktree when the checkout belongs to another pull request, unrelated changes obstruct the task, parallel work requires it, or the user requests isolation. Do not use detached `HEAD` as a durable development or handoff state.
+1. **Code complete** — scoped implementation and focused local evidence exist on a named task branch.
+2. **GitHub integrated** — the reviewed pull request is merged into its stated target repository and base. A fork merge is not an upstream merge.
+3. **Locally applied** — the intended DSH installation or source-linked profile runs the merged artifacts and has been restarted and validated.
+4. **Artifacts ready** — the matching DSH release-family tarballs were built and verified from one release candidate.
+5. **Published** — the protected release workflow uploaded the tagged DSH family, registry state was verified, and consumers can upgrade.
+
+The fields are not one automatic ladder: branch artifacts may be tested before merge, and a published version may remain unapplied on a particular machine. A merge changes Git history only. It does not rebuild or restart a running DSH process, update a profile dependency, create a release artifact, or publish npm packages.
+
+## Development and GitHub operations
+
+1. Inspect the branch, `git status --short`, relevant diffs, current pull request, intended repository and base, and `git worktree list`. Read the nearest instructions and identify the smallest owning package and focused evidence.
+2. Continue the current named task branch when it belongs to the request and has no conflicting work. Use a named branch in an isolated Codex-managed worktree when another task owns the checkout, unrelated changes obstruct work, parallel execution requires it, or the user requests isolation. Detached `HEAD` is not a durable development or handoff state.
 3. Implement the smallest coherent change. Keep UI, transport, Host process, and composition behavior with their owners. Change Remote types, producer, and consumer together. Add the smallest tests and documentation required by inherited repository policy.
 4. Run focused checks while developing. Before push, inspect the complete diff and use `dsh-pre-push-checks` to select relevant evidence.
-5. Commit the reviewed task paths, push the named branch, create or update its pull request, and inspect CI for the pushed head. Report local checks separately from remote CI.
-6. Present the reviewed pull request and obtain explicit user confirmation before merge.
+5. Commit only reviewed task paths, push the named branch, create or update its pull request, and inspect CI for the exact pushed head. Present the reviewed pull request and obtain explicit user confirmation before merge.
 
-An implementation request authorizes scoped edits, a task branch, commits, pushes, pull-request creation or updates, and CI investigation. It does not authorize merging, destructive history changes, deleting branches or worktrees, or deploying. Preserve unrelated work.
+An implementation request authorizes scoped edits, a task branch, commits, pushes, pull-request creation or updates, and CI investigation. It does not authorize merge, destructive history changes, branch or worktree deletion, local application, tagging, or publication.
+
+## Local application
+
+Apply a merged change only when the user requests updating the local DSH instance. Development-time tests or a branch preview remain code-complete evidence; they do not mean the stable local instance was updated. For a source-linked profile, update the linked source checkout to the intended merged commit, run `pnpm install` when manifests or the lockfile changed, run `pnpm run build`, restart DSH, refresh the browser, and validate the affected flow. The production Web runner can serve stale built Host, Client, or frontend artifacts; a source link alone is not evidence that new code is running.
+
+For an npm- or tarball-installed profile, update the profile dependency with `dsh plugin --profile <name> update <package>` or install the approved tarball, then restart DSH and validate. Do not describe Codex Desktop as this project's runtime or validation target.
+
+## Distribution and release
+
+Do not present a GitHub source install as a supported distribution path for this monorepo bundle: it has no standalone `prepare` build and depends on sibling workspace packages. Internal tarball sharing uses one matching DSH release-family artifact set, produced with the repository release scripts and verified as an installed set; do not hand out an unverified bundle tarball in isolation.
+
+Public publication follows the repository's DSH release sequence: align the intended release branch with its required upstream baseline, advance the shared DSH family version, review and merge that release change, create the matching `dsh-v<version>` tag, and manually dispatch `Release (dsh)` with publication enabled. Publication requires the protected `npm-publish` environment and `NPM_TOKEN`. Verify npm after upload; consumers then update the matching package family and restart DSH. Tag creation and publication require explicit user authorization.
 
 ## Product invariants
 
@@ -42,8 +63,6 @@ pnpm exec tsc -b packages/bundle/dsh-codex_shared_pool
 pnpm run verify-translation-pairing packages/bundle/dsh-codex_shared_pool/README.md
 ```
 
-Also run focused tests and builds for each changed internal package. Pull-request CI is the authority for exhaustive repository checks and the platform matrix. Run a full local suite only when the user requests it, CI is unavailable, reproducing a CI failure requires it, the affected behavior lacks CI coverage, or the change is irreducibly repository-wide.
+Also run focused tests and builds for each changed internal package. Pull-request CI owns exhaustive repository checks and the platform matrix; widen local checks only when requested, CI is unavailable or insufficient, reproducing a failure requires it, or the change is irreducibly repository-wide.
 
-Use Local validation only when the user's running desktop application, credentials, service, or IDE state is required. Commit the candidate on its named task branch before handoff; return discovered fixes to that same branch.
-
-End an implementation task with the user-visible result, changed files, local checks, CI status for the exact head, pull-request/base details, residual risks, and Git/worktree state. A local-only patch is complete only when the user explicitly requested one.
+End each task with the applicable delivery states, user-visible result, changed files, local checks, CI for the exact head, repository/base or release artifact details, residual risks, and exact Git/worktree state. Leave unrelated work untouched.

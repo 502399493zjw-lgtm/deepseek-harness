@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-18-codex-shared-pool-development-flow.md
-2026-08-18-codex-shared-pool-development-flow.md: d348dd55cc1a2de98385034cc028e5ae40ca367c
-2026-08-18-codex-shared-pool-development-flow.zh.md: 4ffd9ffb6b1ac034555fd7dea09b4787370d14d2
+2026-08-18-codex-shared-pool-development-flow.md: 97f6712b7eb49abe27ce21399657101c92dc556e
+2026-08-18-codex-shared-pool-development-flow.zh.md: bea2fe950e7786f13227aaf5558429d26ed074a8
