@@ -40,7 +40,7 @@ export function formatCodexResetTime(epochMs: number): string {
   return `${month}月${day} ${hour}:${minute}`
 }
 
-/** Render active-account and pool quota directly above sidebar bottom actions. */
+/** Render active-account identity and quota directly above sidebar bottom actions. */
 export function CodexQuotaFooter({ wide, read, openSettings, t }: CodexQuotaFooterProps) {
   const { snapshot, unavailable } = useCodexQuota(read)
 
@@ -75,10 +75,12 @@ export function CodexQuotaFooter({ wide, read, openSettings, t }: CodexQuotaFoot
 
   return (
     <section className={css.root} aria-label={t('aria')}>
+      <div className={css.accountLine} aria-live="polite">
+        <span className={css.accountLabel}>{t('account')}</span>
+        <span className={css.account}>{snapshot.currentAccountName}</span>
+      </div>
       <div className={css.primary}>
         <div className={css.current} aria-live="polite">
-          <span className={css.account}>{snapshot.currentAccountName}</span>
-          <span className={css.separator} aria-hidden> · </span>
           <span>{t('remaining')} </span>
           <span className={css.quota}>{snapshot.currentRemainingPercent}%</span>
           <span className={css.separator} aria-hidden> · </span>

@@ -11,7 +11,7 @@ DeepSeek Harness Codex 集成唯一的公开插件与安装入口。一条 Loade
 [`cordis.patch.yml`](cordis.patch.yml) 只贡献 `codex-shared-pool`，模块名为 `@deepseek-ai/dsh-codex_shared_pool`。它为新 agent（智能体）选择 `openai-codex` / `gpt-5.6-sol`，并选择 Codex 搜索提供方；已保存的模型选择仍然优先。
 
 - Host 入口持有 OAuth profile、模型与搜索适配器、图片工具策略、浏览器认证路由、TUI 命令和可选额度子能力。
-- 浏览器入口持有 `openai-codex` 设置分区、模型偏好、图片工具渲染，以及侧边栏底部操作上方的两行额度块。箭头操作会打开同一个设置分区。
+- 浏览器入口持有 `openai-codex` 设置分区、模型偏好、图片工具渲染，以及侧边栏底部操作上方的三行账号与额度块。箭头操作会打开同一个设置分区。
 - [`packages/host/codex-quota`](../../host/codex-quota/README.md) 通过 `codex app-server --stdio` 读取官方 Codex home，[`packages/api/remotes`](../../api/remotes/README.md) 传递可安全显示的 `codexQuota/read` 结果。两个包都没有独立 Loader 配置项。
 
 `dsh-openai-codex` 可执行文件为终端或无界面安装提供 `login`、`status` 和 `logout`。TUI 贡献暴露相同提供方及 `/codex status|login|logout|usage|config` 命令族，无需注册第二个 `/tui` 插件。
@@ -58,7 +58,7 @@ DeepSeek Harness Codex 集成唯一的公开插件与安装入口。一条 Loade
 
 打开**设置 → OpenAI Codex**即可添加、选择或移除 DSH 持有的 ChatGPT OAuth profile，并查看每个 profile 的实时 Codex 限额。关闭授权窗口只会取消尚未完成的登录，已存储的 profile 保持不变，**添加账号**操作会恢复可用。账号标签依次使用 OAuth profile 的 `name` 和 `email`。DSH 凭据位于 Harness home，与 Codex CLI/Desktop 凭据相互独立。
 
-侧边栏第一行显示当前官方 Codex-home 账号标签、主要窗口剩余额度比例和重置时刻；重置时刻按浏览器本地时区显示为固定的 `M月D HH:mm` 格式，例如 `8月17 15:54`。月份和日期不补零，小时和分钟使用两位数。颜色更浅的第二行显示已配置账号数和所剩比例平均值。只有当前账号的百分比使用蓝色。额度块在折叠侧栏中隐藏，其箭头会打开 **OpenAI Codex**，并且不会遮挡侧边栏内容。
+侧边栏第一行以 `Codex 账号：<账号标签>` 标识当前官方 Codex-home 账号。第二行显示主要窗口剩余额度比例和重置时刻；重置时刻按浏览器本地时区显示为固定的 `M月D HH:mm` 格式，例如 `8月17 15:54`。月份和日期不补零，小时和分钟使用两位数。颜色更浅的第三行显示已配置账号数和所剩比例平均值。只有当前账号的百分比使用蓝色。额度块在折叠侧栏中隐藏，其箭头会打开 **OpenAI Codex**，并且不会遮挡侧边栏内容。
 
 ## 安全与失败行为
 

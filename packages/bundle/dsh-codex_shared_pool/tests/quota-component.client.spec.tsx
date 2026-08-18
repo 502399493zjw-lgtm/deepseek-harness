@@ -42,21 +42,25 @@ function props(overrides: Partial<CodexQuotaFooterProps> = {}): CodexQuotaFooter
 }
 
 describe('unified Codex quota footer', () => {
-  it('uses the settings account name and reserves blue for the current quota', async () => {
+  it('puts the settings account name above the quota and reserves blue for the current quota', async () => {
     const view = render(<CodexQuotaFooter {...props()} />)
     expect(await screen.findByText('经纬 钟')).toBeTruthy()
 
-    const rows = view.container.querySelectorAll(`.${css.current}, .${css.pool}`)
-    expect(rows).toHaveLength(2)
-    expect(rows[0]?.textContent).toBe('经纬 钟 · 剩余 73% · 重置时间未知')
-    expect(rows[1]?.textContent).toBe('账号池 12 个账号 · 总剩余 61%')
+    const rows = view.container.querySelectorAll(
+      `.${css.accountLine}, .${css.current}, .${css.pool}`,
+    )
+    expect(rows).toHaveLength(3)
+    expect(rows[0]?.textContent).toBe('Codex 账号：经纬 钟')
+    expect(rows[1]?.textContent).toBe('剩余 73% · 重置时间未知')
+    expect(rows[2]?.textContent).toBe('账号池 12 个账号 · 总剩余 61%')
 
     const blue = view.container.querySelectorAll(`.${css.quota}`)
     expect([...blue].map(node => node.textContent)).toEqual(['73%'])
-    expect(view.container.querySelectorAll(`.${css.separator}`)).toHaveLength(3)
+    expect(view.container.querySelectorAll(`.${css.separator}`)).toHaveLength(2)
     const open = screen.getByRole('button', { name: '打开' })
-    expect(rows[0]?.parentElement).toBe(open.parentElement)
-    expect(rows[1]?.parentElement).toBe(view.container.firstElementChild)
+    expect(rows[0]?.parentElement).toBe(view.container.firstElementChild)
+    expect(rows[1]?.parentElement).toBe(open.parentElement)
+    expect(rows[2]?.parentElement).toBe(view.container.firstElementChild)
   })
 
   it('opens the unified Codex settings section from the arrow action', async () => {
