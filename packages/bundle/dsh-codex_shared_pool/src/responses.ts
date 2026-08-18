@@ -17,6 +17,7 @@ import {
   convertResponsesMessages,
   convertResponsesTools,
 } from '@earendil-works/pi-ai/api/openai-responses-shared'
+import { closeOpenAICodexWebSocketSessions } from '@earendil-works/pi-ai/api/openai-codex-responses'
 import type { ResponseApiPreferences } from './tool-policy.ts'
 import { supportsCodexFastMode } from './model-capabilities.ts'
 
@@ -338,7 +339,18 @@ function retainedCompactionInput(input: readonly unknown[]): unknown[] {
 export class OpenAICodexResponseRuntime {
   private readonly compactionCalls = new Map<string, number>()
 
-  constructor(private readonly preferences: () => ResponseApiPreferences) {}
+  constructor(
+    private readonly preferences: () => ResponseApiPreferences,
+    private readonly closeSessionContext: (sessionId: string) => void = closeOpenAICodexWebSocketSessions,
+  ) {}
+
+  /**
+   * Close provider-owned continuation state before a Session changes account.
+   * @param sessionId - Session whose next request must send full context.
+   */
+  resetSessionContext(sessionId: string): void {
+    this.closeSessionContext(sessionId)
+  }
 
   /**
    * Mark one Harness stream call as compaction until its iterator closes.

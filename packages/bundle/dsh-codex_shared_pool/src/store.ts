@@ -1,5 +1,5 @@
 /**
- * Owner-only, manually selected OAuth profile storage for OpenAI Codex.
+ * Owner-only ordered OAuth profile storage and Session binding for OpenAI Codex.
  * @module @deepseek-ai/dsh-codex_shared_pool/store
  */
 
@@ -19,8 +19,11 @@ export const OPENAI_CODEX_AUTH_FILENAME = '.openai-codex-profiles.json'
 /** Previous single-account document, read only for a non-destructive migration. */
 export const LEGACY_OPENAI_CODEX_AUTH_FILENAME = '.openai-codex-auth.json'
 
-/** Current on-disk format. */
-const AUTH_FORMAT_VERSION = 1
+/** Current ordered-profile on-disk format. */
+const AUTH_FORMAT_VERSION = 2
+
+/** Prior single-account document format. */
+const LEGACY_AUTH_FORMAT_VERSION = 1
 
 interface StoredProfile {
   id: string
@@ -36,7 +39,6 @@ interface StoredOAuthCredential extends OAuthCredential {
 
 interface AuthDocument {
   version: typeof AUTH_FORMAT_VERSION
-  activeProfileId?: string
   profiles: StoredProfile[]
 }
 
@@ -44,7 +46,6 @@ interface AuthDocument {
 export interface CodexProfileSummary {
   id: string
   label: string
-  active: boolean
   createdAt: number
   updatedAt: number
 }
@@ -138,14 +139,11 @@ function parseDocument(text: string, filename: string): AuthDocument {
   if (rawDocument['version'] !== AUTH_FORMAT_VERSION) {
     throw new Error(`openai-codex: ${filename} has unsupported auth format version ${String(rawDocument['version'])}`)
   }
-  if (Object.keys(rawDocument).some(key => !['version', 'activeProfileId', 'profiles'].includes(key))) {
+  if (Object.keys(rawDocument).some(key => !['version', 'profiles'].includes(key))) {
     throw new Error(`openai-codex: ${filename} contains an unknown top-level field`)
   }
   if (!Array.isArray(rawDocument['profiles'])) {
     throw new Error(`openai-codex: ${filename} profiles must be an array`)
-  }
-  if (rawDocument['activeProfileId'] !== undefined && typeof rawDocument['activeProfileId'] !== 'string') {
-    throw new Error(`openai-codex: ${filename} activeProfileId must be a string`)
   }
 
   const ids = new Set<string>()
@@ -184,17 +182,9 @@ function parseDocument(text: string, filename: string): AuthDocument {
       updatedAt,
     }
   })
-  const activeProfileId = rawDocument['activeProfileId']
-  if (activeProfileId !== undefined && !ids.has(activeProfileId)) {
-    throw new Error(`openai-codex: ${filename} active profile does not exist`)
-  }
-  if (profiles.length > 0 && activeProfileId === undefined) {
-    throw new Error(`openai-codex: ${filename} must select an active profile`)
-  }
   return {
     version: AUTH_FORMAT_VERSION,
     profiles,
-    ...(activeProfileId === undefined ? {} : { activeProfileId }),
   }
 }
 
@@ -209,7 +199,7 @@ function parseLegacyDocument(text: string, filename: string): StoredOAuthCredent
     throw new Error(`openai-codex: ${filename} must contain an object`)
   }
   const document = value as Record<string, unknown>
-  if (document['version'] !== AUTH_FORMAT_VERSION || Object.keys(document).some(key => !['version', 'credential'].includes(key))) {
+  if (document['version'] !== LEGACY_AUTH_FORMAT_VERSION || Object.keys(document).some(key => !['version', 'credential'].includes(key))) {
     throw new Error(`openai-codex: ${filename} is not a supported legacy auth document`)
   }
   return parseCredential(document['credential'], filename)
@@ -231,6 +221,11 @@ function emptyDocument(): AuthDocument {
   return { version: AUTH_FORMAT_VERSION, profiles: [] }
 }
 
+interface SessionProfileReplacement {
+  readonly profileId: string
+  readonly replaced: boolean
+}
+
 /**
  * Resolve the default OAuth profile document path.
  * @param dshHome - Optional DSH home override.
@@ -240,7 +235,7 @@ export function openAICodexAuthPath(dshHome?: string): string {
   return resolve(join(resolveDshHome(dshHome), OPENAI_CODEX_AUTH_FILENAME))
 }
 
-/** File-backed pi-ai store with explicit profile selection and per-session pinning. */
+/** File-backed pi-ai store with ordered profiles and quota-checked Session bindings. */
 export class OpenAICodexCredentialStore implements CredentialStore {
   /** Absolute path of the owned profile document. */
   readonly filename: string
@@ -285,7 +280,7 @@ export class OpenAICodexCredentialStore implements CredentialStore {
       createdAt: modifiedAt,
       updatedAt: modifiedAt,
     }
-    return { version: AUTH_FORMAT_VERSION, activeProfileId: profile.id, profiles: [profile] }
+    return { version: AUTH_FORMAT_VERSION, profiles: [profile] }
   }
 
   private async transaction<T>(fn: (document: AuthDocument) => Promise<T> | T): Promise<T> {
@@ -307,16 +302,17 @@ export class OpenAICodexCredentialStore implements CredentialStore {
     if (sessionId !== undefined) {
       const bound = this.sessionBindings.get(sessionId)
       if (bound !== undefined && document.profiles.some(profile => profile.id === bound)) return bound
-      if (document.activeProfileId !== undefined) this.sessionBindings.set(sessionId, document.activeProfileId)
+      const firstProfileId = document.profiles[0]?.id
+      if (firstProfileId !== undefined) this.sessionBindings.set(sessionId, firstProfileId)
+      return firstProfileId
     }
-    return document.activeProfileId
+    return document.profiles[0]?.id
   }
 
-  private summary(profile: StoredProfile, activeProfileId: string | undefined): CodexProfileSummary {
+  private summary(profile: StoredProfile): CodexProfileSummary {
     return {
       id: profile.id,
       label: openAICodexAccountName(profile.credential) ?? profile.label,
-      active: profile.id === activeProfileId,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
     }
@@ -328,15 +324,65 @@ export class OpenAICodexCredentialStore implements CredentialStore {
    */
   async listProfiles(): Promise<readonly CodexProfileSummary[]> {
     const document = await this.readDocument()
-    return document.profiles.map(profile => this.summary(profile, document.activeProfileId))
+    return document.profiles.map(profile => this.summary(profile))
   }
 
   /**
-   * Read the profile selected for new sessions.
-   * @returns Profile selected for new sessions, when one exists.
+   * Read a valid in-memory profile binding for one Session.
+   * @param sessionId - Session whose binding is requested.
+   * @returns Bound profile id, or undefined before allocation or after removal.
    */
-  async activeProfileId(): Promise<string | undefined> {
-    return (await this.readDocument()).activeProfileId
+  async sessionProfileId(sessionId: string): Promise<string | undefined> {
+    const profileId = this.sessionBindings.get(sessionId)
+    if (profileId === undefined) return undefined
+    if ((await this.readDocument()).profiles.some(profile => profile.id === profileId)) return profileId
+    this.sessionBindings.delete(sessionId)
+    return undefined
+  }
+
+  /**
+   * Commit the first valid profile binding for one Session.
+   * @param sessionId - Session receiving a profile binding.
+   * @param profileId - Ordered profile selected by the allocator.
+   * @returns The binding retained for the Session.
+   */
+  async bindSessionProfile(sessionId: string, profileId: string): Promise<string> {
+    const document = await this.readDocument()
+    const existing = this.sessionBindings.get(sessionId)
+    if (existing !== undefined && document.profiles.some(profile => profile.id === existing)) return existing
+    if (!document.profiles.some(profile => profile.id === profileId)) {
+      throw new Error(`openai-codex: profile does not exist: ${profileId}`)
+    }
+    this.sessionBindings.set(sessionId, profileId)
+    return profileId
+  }
+
+  /**
+   * Replace one Session binding only while the inspected profile remains current.
+   * @param sessionId - Session whose binding may be replaced.
+   * @param expectedProfileId - Profile observed before quota inspection.
+   * @param profileId - Replacement selected by the allocator.
+   * @returns The committed binding and whether this call replaced it, or undefined after invalidation.
+   */
+  async replaceSessionProfile(
+    sessionId: string,
+    expectedProfileId: string,
+    profileId: string,
+  ): Promise<SessionProfileReplacement | undefined> {
+    const document = await this.readDocument()
+    const existing = this.sessionBindings.get(sessionId)
+    if (existing !== expectedProfileId) {
+      if (existing !== undefined && document.profiles.some(profile => profile.id === existing)) {
+        return { profileId: existing, replaced: false }
+      }
+      this.sessionBindings.delete(sessionId)
+      return undefined
+    }
+    if (!document.profiles.some(profile => profile.id === profileId)) {
+      throw new Error(`openai-codex: profile does not exist: ${profileId}`)
+    }
+    this.sessionBindings.set(sessionId, profileId)
+    return { profileId, replaced: profileId !== expectedProfileId }
   }
 
   /**
@@ -361,21 +407,22 @@ export class OpenAICodexCredentialStore implements CredentialStore {
         updatedAt: now,
       }
       document.profiles.push(profile)
-      document.activeProfileId ??= profile.id
-      return this.summary(profile, document.activeProfileId)
+      return this.summary(profile)
     })
   }
 
   /**
-   * Select the profile used by new sessions.
-   * @param profileId - Profile selected for new sessions.
+   * Make one profile the first candidate for every allocation decision.
+   * @param profileId - Profile to move to the front of the stored order.
    */
-  async setActiveProfile(profileId: string): Promise<void> {
+  async prioritizeProfile(profileId: string): Promise<void> {
     await this.transaction((document) => {
-      if (!document.profiles.some(profile => profile.id === profileId)) {
-        throw new Error(`openai-codex: profile does not exist: ${profileId}`)
-      }
-      document.activeProfileId = profileId
+      const index = document.profiles.findIndex(profile => profile.id === profileId)
+      if (index === -1) throw new Error(`openai-codex: profile does not exist: ${profileId}`)
+      if (index === 0) return
+      const [profile] = document.profiles.splice(index, 1)
+      if (profile === undefined) throw new Error(`openai-codex: profile does not exist: ${profileId}`)
+      document.profiles.unshift(profile)
     })
   }
 
@@ -403,11 +450,6 @@ export class OpenAICodexCredentialStore implements CredentialStore {
       const index = document.profiles.findIndex(profile => profile.id === profileId)
       if (index === -1) throw new Error(`openai-codex: profile does not exist: ${profileId}`)
       document.profiles.splice(index, 1)
-      if (document.activeProfileId === profileId) {
-        const replacement = document.profiles[0]?.id
-        if (replacement === undefined) delete document.activeProfileId
-        else document.activeProfileId = replacement
-      }
       for (const [sessionId, boundProfileId] of this.sessionBindings) {
         if (boundProfileId === profileId) this.sessionBindings.delete(sessionId)
       }
@@ -495,7 +537,6 @@ export class OpenAICodexCredentialStore implements CredentialStore {
           updatedAt: now,
         }
         document.profiles.push(profile)
-        document.activeProfileId = profile.id
         profileId = profile.id
         const sessionId = this.resolveSessionId?.()
         if (sessionId !== undefined) this.sessionBindings.set(sessionId, profileId)
@@ -507,7 +548,7 @@ export class OpenAICodexCredentialStore implements CredentialStore {
     })
   }
 
-  /** Delete the currently selected profile. */
+  /** Delete the profile resolved for the current Session or global priority. */
   async delete(providerId: string): Promise<void> {
     if (providerId !== OPENAI_CODEX_PROVIDER) return
     const document = await this.readDocument()

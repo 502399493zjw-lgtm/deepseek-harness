@@ -1,8 +1,8 @@
 - region "ChatGPT 账号":
   - heading "ChatGPT 账号" [level=2]
   - paragraph: 使用你的 ChatGPT 订阅即可调用 Codex，无需 API Key 或额外配置。
-  - complementary "ChatGPT 账号":
-    - heading "账号 (0)" [level=3]
+  - complementary "账号额度优先顺序":
+    - heading "额度优先顺序 (0)" [level=3]
     - button "添加账号":
       - img
       - text: 添加账号

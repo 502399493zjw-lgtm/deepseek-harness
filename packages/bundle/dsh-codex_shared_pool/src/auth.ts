@@ -31,7 +31,7 @@ export async function loginOpenAICodex(
   await models.login(OPENAI_CODEX_PROVIDER, 'oauth', interaction)
 }
 
-/** Minimal temporary store used so a new OAuth login cannot overwrite the active profile. */
+/** Minimal temporary store used so a new OAuth login cannot overwrite any stored profile. */
 class CapturedCredentialStore implements CredentialStore {
   private credential: Credential | undefined
 
@@ -85,7 +85,7 @@ export async function loginOpenAICodexProfile(
 }
 
 /**
- * Remove the stored OpenAI Codex credential.
+ * Remove the request-resolved OpenAI Codex profile.
  * @param store - credential store, defaulting under `$DSH_HOME`.
  */
 export async function logoutOpenAICodex(

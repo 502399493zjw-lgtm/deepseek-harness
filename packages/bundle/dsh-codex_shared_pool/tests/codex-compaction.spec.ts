@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { zstdDecompressSync } from 'node:zlib'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import {
   BlockAssembler,
   CallId,
@@ -13,6 +15,7 @@ import {
 } from '@deepseek-ai/dsh-llm'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
 import WebRuntime from '@deepseek-ai/dsh-web'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import * as OpenAICodex from '../src/index.ts'
 
 let context: Context | undefined
@@ -109,6 +112,79 @@ function userMessage(text: string) {
 }
 
 describe('OpenAI Codex compaction request', () => {
+  it('applies global priority and quota fallback to the next request of an active Session', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-openai-codex-active-failover-'))
+    vi.stubEnv('DSH_HOME', root)
+    const store = new OpenAICodex.OpenAICodexCredentialStore()
+    await store.addProfile('First', {
+      type: 'oauth',
+      access: accessToken('account-1'),
+      refresh: 'refresh-1',
+      expires: Date.now() + 3_600_000,
+      accountId: 'account-1',
+    })
+    const second = await store.addProfile('Second', {
+      type: 'oauth',
+      access: accessToken('account-2'),
+      refresh: 'refresh-2',
+      expires: Date.now() + 3_600_000,
+      accountId: 'account-2',
+    })
+
+    let secondExhausted = false
+    const usageAccounts: string[] = []
+    const responseAccounts: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
+      const url = requestUrl(input)
+      const headers = new Headers(init?.headers)
+      const accountId = headers.get('chatgpt-account-id')
+      if (accountId === null) throw new Error('expected account identity')
+      if (url === 'https://chatgpt.com/backend-api/wham/usage') {
+        usageAccounts.push(accountId)
+        const remaining = accountId === 'account-2' && secondExhausted ? 0 : 50
+        return Response.json({
+          rate_limit: {
+            allowed: remaining > 0,
+            limit_reached: remaining === 0,
+            primary_window: { used_percent: 100 - remaining, limit_window_seconds: 604_800 },
+          },
+        })
+      }
+      responseAccounts.push(accountId)
+      return new Response(responseEvents(`resp_${responseAccounts.length}`, 'continued'), {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      })
+    })
+
+    const ctx = new Context()
+    context = ctx
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(WebRuntime)
+    await ctx.plugin(OpenAICodex)
+    const sessionId = SessionId('session-active-failover')
+    const initiator = { id: sessionId, session: { id: sessionId } } as Agent
+    const run = async (text: string): Promise<void> => {
+      for await (const _chunk of ctx.llm.stream({
+        provider: 'openai-codex',
+        model: 'gpt-5.6-sol',
+        system: 'Continue this conversation.',
+        messages: [userMessage(text)],
+        sessionId,
+      })) { /* drain */ }
+    }
+
+    await ctx.agents.withInitiator(initiator, () => run('first request'))
+    await store.prioritizeProfile(second.id)
+    await ctx.agents.withInitiator(initiator, () => run('next request'))
+    secondExhausted = true
+    await ctx.agents.withInitiator(initiator, () => run('fallback request'))
+
+    expect(usageAccounts).toEqual(['account-1', 'account-2', 'account-2', 'account-1'])
+    expect(responseAccounts).toEqual(['account-1', 'account-2', 'account-1'])
+  })
+
   it('keeps stateless reasoning and paired tool history without sending a standard output cap', async () => {
     root = await mkdtemp(join(tmpdir(), 'dsh-openai-codex-compaction-'))
     vi.stubEnv('DSH_HOME', root)
@@ -244,6 +320,9 @@ describe('OpenAI Codex compaction request', () => {
       if (init === undefined) throw new Error('expected request init')
       const request = { url: requestUrl(input), init }
       requests.push(request)
+      if (request.url === 'https://chatgpt.com/backend-api/wham/usage') {
+        return Response.json({ rate_limit: { allowed: true, limit_reached: false } })
+      }
       const body = requestJson(init)
       if (Array.isArray(body.input) && body.input.some(item => (
         typeof item === 'object' && item !== null && (item as { type?: string }).type === 'compaction_trigger'
@@ -301,11 +380,13 @@ describe('OpenAI Codex compaction request', () => {
     })) continued.push(chunk)
 
     expect(requests.map(request => request.url)).toEqual([
+      'https://chatgpt.com/backend-api/wham/usage',
       'https://chatgpt.com/backend-api/codex/responses',
+      'https://chatgpt.com/backend-api/wham/usage',
       'https://chatgpt.com/backend-api/codex/responses',
     ])
-    const compactBody = requestJson(requests[0]!.init)
-    const compactHeaders = new Headers(requests[0]!.init.headers)
+    const compactBody = requestJson(requests[1]!.init)
+    const compactHeaders = new Headers(requests[1]!.init.headers)
     expect(compactHeaders.get('thread-id')).toBe('session-native-compact')
     expect(compactHeaders.get('x-codex-routing-hint')).toBe('model=gpt-5.6-sol')
     expect(compactBody).toMatchObject({
@@ -320,7 +401,7 @@ describe('OpenAI Codex compaction request', () => {
       { role: 'user', content: [{ type: 'input_text', text: 'keep this request' }] },
       { type: 'compaction_trigger' },
     ])
-    const continuedBody = requestJson(requests[1]!.init)
+    const continuedBody = requestJson(requests[3]!.init)
     expect(continuedBody.service_tier).toBe('priority')
     expect(continuedBody.input).toEqual([
       ...restoredOutput,
@@ -345,6 +426,9 @@ describe('OpenAI Codex compaction request', () => {
       if (init === undefined) throw new Error('expected request init')
       const request = { url: requestUrl(input), init }
       requests.push(request)
+      if (request.url === 'https://chatgpt.com/backend-api/wham/usage') {
+        return Response.json({ rate_limit: { allowed: true, limit_reached: false } })
+      }
       const body = requestJson(init)
       if (Array.isArray(body.input) && body.input.some(item => (
         typeof item === 'object' && item !== null && (item as { type?: string }).type === 'compaction_trigger'
@@ -384,10 +468,11 @@ describe('OpenAI Codex compaction request', () => {
       model: 'gpt-5.6-sol',
     }).content).toEqual([{ type: 'text', text: 'fallback summary' }])
     expect(requests.map(request => request.url)).toEqual([
+      'https://chatgpt.com/backend-api/wham/usage',
       'https://chatgpt.com/backend-api/codex/responses',
       'https://chatgpt.com/backend-api/codex/responses',
     ])
-    expect(requestJson(requests[1]!.init).input).toEqual([
+    expect(requestJson(requests[2]!.init).input).toEqual([
       { role: 'user', content: [{ type: 'input_text', text: 'keep this request' }] },
       { role: 'user', content: [{ type: 'input_text', text: 'Summarize the conversation.' }] },
     ])

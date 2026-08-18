@@ -1,0 +1,26 @@
+- region "ChatGPT 账号":
+  - heading "ChatGPT 账号" [level=2]
+  - paragraph: 使用你的 ChatGPT 订阅即可调用 Codex，无需 API Key 或额外配置。
+  - complementary "账号额度优先顺序":
+    - heading "额度优先顺序 (2)" [level=3]
+    - button "添加账号":
+      - img
+      - text: 添加账号
+    - button "工作账号 优先"
+    - button "个人账号"
+  - region "工作账号":
+    - heading "工作账号" [level=3]
+    - status: 连接正常
+    - button "优先使用"
+    - heading "使用额度" [level=3]
+    - heading "Codex" [level=4]
+    - text: 每周额度 剩余 100%
+    - progressbar "每周额度"
+    - button "移除账号":
+      - img
+      - text: 移除账号
+  - button "网络与高级设置 代理与 3 项可选功能":
+    - img
+    - strong: 网络与高级设置
+    - text: 代理与 3 项可选功能
+    - img
