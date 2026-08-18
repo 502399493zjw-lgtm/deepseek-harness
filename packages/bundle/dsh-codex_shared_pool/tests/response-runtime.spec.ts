@@ -18,11 +18,12 @@ function runtimeHarness(initialReuse: boolean, initialFast = false) {
       return createAssistantMessageEventStream()
     },
   } satisfies typeof base
+  const closedSessions: string[] = []
   const runtime = new OpenAICodexResponseRuntime(() => ({
     useFastMode: fast,
     useWebSocketContextReuse: reuse,
     useNativeCompaction: false,
-  }))
+  }), sessionId => closedSessions.push(sessionId))
   const wrapped = runtime.wrap(provider)
   const model = base.getModels().find(candidate => candidate.id === 'gpt-5.6-sol')
     ?? base.getModels()[0]
@@ -33,6 +34,7 @@ function runtimeHarness(initialReuse: boolean, initialFast = false) {
   return {
     transports,
     streamOptions,
+    closedSessions,
     runtime,
     model,
     call,
@@ -55,6 +57,16 @@ describe('OpenAICodexResponseRuntime transport policy', () => {
 
     harness.call('session-websocket')
 
+    expect(harness.transports).toEqual(['websocket-cached'])
+  })
+
+  it('closes provider-owned continuation state when a Session changes account', () => {
+    const harness = runtimeHarness(true)
+
+    harness.runtime.resetSessionContext('session-switch')
+    harness.call('session-switch')
+
+    expect(harness.closedSessions).toEqual(['session-switch'])
     expect(harness.transports).toEqual(['websocket-cached'])
   })
 

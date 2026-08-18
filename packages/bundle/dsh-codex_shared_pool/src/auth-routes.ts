@@ -24,8 +24,8 @@ export const OPENAI_CODEX_PROFILES_PATH = '/plugins/dsh-openai-codex/profiles'
 export const OPENAI_CODEX_PROFILE_LOGIN_PATH = '/plugins/dsh-openai-codex/profiles/login'
 /** Cancel the current browser-login operation without removing stored profiles. */
 export const OPENAI_CODEX_PROFILE_LOGIN_CANCEL_PATH = '/plugins/dsh-openai-codex/profiles/login/cancel'
-/** Explicitly select the profile used by new sessions. */
-export const OPENAI_CODEX_PROFILE_ACTIVATE_PATH = '/plugins/dsh-openai-codex/profiles/activate'
+/** Move one profile to the front of the global allocation order. */
+export const OPENAI_CODEX_PROFILE_PRIORITY_PATH = '/plugins/dsh-openai-codex/profiles/priority'
 /** Rename one profile without exposing its credentials. */
 export const OPENAI_CODEX_PROFILE_RENAME_PATH = '/plugins/dsh-openai-codex/profiles/rename'
 /** Remove one profile from this plugin. */
@@ -164,13 +164,12 @@ export class OpenAICodexWebAuth {
   }
 
   /**
-   * Select the profile used by new sessions.
-   * @param profileId - Profile selected for new sessions.
+   * Make one stored profile the first candidate for every Codex allocation.
+   * @param profileId - Profile to move to the front of the allocation order.
    */
-  async activateProfile(profileId: string): Promise<void> {
+  async prioritizeProfile(profileId: string): Promise<void> {
     if (this.operation !== undefined) throw new Error('wait for the current sign-in to finish')
-    await this.store.setActiveProfile(profileId)
-    this.state = await this.readStoredStatus()
+    await this.store.prioritizeProfile(profileId)
   }
 
   /**
@@ -448,13 +447,13 @@ export function registerOpenAICodexAuthRoutes(
       }),
       ctx.webServer.register({
         kind: 'exact',
-        path: OPENAI_CODEX_PROFILE_ACTIVATE_PATH,
+        path: OPENAI_CODEX_PROFILE_PRIORITY_PATH,
         handler: async (req, res) => {
-          if (req.method !== 'POST') {  json(res, 405, { error: 'method not allowed' }); return }
-          if (!trustedRequest(req)) {  json(res, 403, { error: 'forbidden' }); return }
+          if (req.method !== 'POST') { json(res, 405, { error: 'method not allowed' }); return }
+          if (!trustedRequest(req)) { json(res, 403, { error: 'forbidden' }); return }
           try {
             const { profileId } = exactStrings(await readJson(req), ['profileId'])
-            await auth.activateProfile(profileId)
+            await auth.prioritizeProfile(profileId)
             json(res, 200, { ok: true })
           } catch (error: unknown) {
             json(res, 400, { error: safeMessage(error) })

@@ -136,10 +136,12 @@ export function parseOpenAICodexUsage(value: unknown): OpenAICodexUsage {
  * Read current quota without issuing a model request. OAuth is refreshed through
  * the same provider-native credential lifecycle used by normal Codex turns.
  * @param store - plugin-owned OAuth credential store.
+ * @param signal - optional caller cancellation signal combined with the request timeout.
  * @returns current rate-limit buckets safe to expose to the local browser page.
  */
 export async function readOpenAICodexRateLimits(
   store: CredentialStore,
+  signal?: AbortSignal,
 ): Promise<OpenAICodexUsage> {
   const models = createModels({ credentials: store })
   models.setProvider(openaiCodexProvider())
@@ -160,7 +162,9 @@ export async function readOpenAICodexRateLimits(
       'cache-control': 'no-store',
       'user-agent': 'dsh-openai-codex',
     },
-    signal: AbortSignal.timeout(USAGE_REQUEST_TIMEOUT_MS),
+    signal: signal === undefined
+      ? AbortSignal.timeout(USAGE_REQUEST_TIMEOUT_MS)
+      : AbortSignal.any([signal, AbortSignal.timeout(USAGE_REQUEST_TIMEOUT_MS)]),
   })
   if (!response.ok) {
     throw new Error(response.status === 401 || response.status === 403

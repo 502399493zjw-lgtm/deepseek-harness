@@ -1,17 +1,22 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { Readable } from 'node:stream'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { describe, expect, it } from 'vitest'
 import {
   OPENAI_CODEX_NETWORK_STATUS_PATH,
   OPENAI_CODEX_PROFILE_LOGIN_CANCEL_PATH,
+  OPENAI_CODEX_PROFILE_PRIORITY_PATH,
   registerOpenAICodexAuthRoutes,
 } from '../src/auth-routes.ts'
 import { OutboundNetwork } from '../src/network.ts'
 import type { OpenAICodexCredentialStore } from '../src/store.ts'
 import type { ImageToolPolicy } from '../src/tool-policy.ts'
 
-function setupRoutes(network: OutboundNetwork): {
+function setupRoutes(
+  network: OutboundNetwork,
+  store = {} as OpenAICodexCredentialStore,
+): {
   routes: Map<string, WebRoute>
   dispose: () => Promise<void>
 } {
@@ -31,7 +36,7 @@ function setupRoutes(network: OutboundNetwork): {
   } as unknown as Context
   registerOpenAICodexAuthRoutes(
     context,
-    {} as OpenAICodexCredentialStore,
+    store,
     {} as ImageToolPolicy,
     network,
   )
@@ -41,17 +46,18 @@ function setupRoutes(network: OutboundNetwork): {
   }
 }
 
-async function request(route: WebRoute | undefined, method: string): Promise<{
+async function request(route: WebRoute | undefined, method: string, requestBody?: unknown): Promise<{
   status: number
   body: string
 }> {
   let status = 0
   let body = ''
-  const req = {
+  const req = Readable.from(requestBody === undefined ? [] : [Buffer.from(JSON.stringify(requestBody))]) as IncomingMessage
+  Object.assign(req, {
     method,
     socket: { remoteAddress: '127.0.0.1' },
     headers: { host: '127.0.0.1:3080' },
-  } as IncomingMessage
+  })
   const response = {
     writeHead(nextStatus: number) {
       status = nextStatus
@@ -96,6 +102,35 @@ describe('OpenAI Codex Web routes', () => {
 
     expect(result.status).toBe(200)
     expect(JSON.parse(result.body)).toEqual({ cancelled: false })
+    await dispose()
+  })
+
+  it('does not expose a manual profile activation route', async () => {
+    const { routes, dispose } = setupRoutes(new OutboundNetwork({}))
+
+    expect(routes.has('/plugins/dsh-openai-codex/profiles/activate')).toBe(false)
+    await dispose()
+  })
+
+  it('moves a confirmed profile to the global allocation priority', async () => {
+    const prioritized: string[] = []
+    const store = {
+      prioritizeProfile(profileId: string) {
+        prioritized.push(profileId)
+        return Promise.resolve()
+      },
+    } as unknown as OpenAICodexCredentialStore
+    const { routes, dispose } = setupRoutes(new OutboundNetwork({}), store)
+
+    const result = await request(
+      routes.get(OPENAI_CODEX_PROFILE_PRIORITY_PATH),
+      'POST',
+      { profileId: 'profile-work' },
+    )
+
+    expect(result.status).toBe(200)
+    expect(JSON.parse(result.body)).toEqual({ ok: true })
+    expect(prioritized).toEqual(['profile-work'])
     await dispose()
   })
 })

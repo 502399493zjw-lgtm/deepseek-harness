@@ -8,6 +8,7 @@ import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepse
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import { allocateOpenAICodexSessionProfile } from './account-allocation.ts'
 import type { OpenAICodexCredentialStore } from './store.ts'
 import { OPENAI_CODEX_PROVIDER } from './store.ts'
 import { OpenAICodexResponseRuntime } from './responses.ts'
@@ -70,6 +71,7 @@ class OpenAICodexAdapter extends PiAiAdapter {
   constructor(
     options: ConstructorParameters<typeof PiAiAdapter>[0],
     private readonly responses: OpenAICodexResponseRuntime,
+    private readonly credentials: OpenAICodexCredentialStore,
   ) {
     super(options)
   }
@@ -97,6 +99,18 @@ class OpenAICodexAdapter extends PiAiAdapter {
   }
 
   override async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    if (options.sessionId !== undefined) {
+      await allocateOpenAICodexSessionProfile(
+        this.credentials,
+        String(options.sessionId),
+        options.model,
+        options.signal,
+        undefined,
+        (sessionId) => {
+          this.responses.resetSessionContext(sessionId)
+        },
+      )
+    }
     const release = options.purpose === 'compaction'
       ? this.responses.enterCompaction(options.sessionId === undefined ? undefined : String(options.sessionId))
       : undefined
@@ -140,5 +154,5 @@ export function createOpenAICodexAdapter(
     profiles: () => profiles,
     resolveApiKey: async () => (await models.getAuth(OPENAI_CODEX_PROVIDER))?.auth.apiKey,
     resolveAttachments,
-  }, responses)
+  }, responses, credentials)
 }

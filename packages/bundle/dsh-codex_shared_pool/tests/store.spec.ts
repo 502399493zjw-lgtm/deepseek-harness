@@ -36,7 +36,7 @@ async function store(): Promise<OpenAICodexCredentialStore> {
 }
 
 describe('OpenAICodexCredentialStore', () => {
-  it('persists, lists, detaches, and removes the active OAuth profile owner-only', async () => {
+  it('persists, lists, detaches, and removes the first OAuth profile owner-only', async () => {
     const auth = await store()
     expect(await auth.read(OPENAI_CODEX_PROVIDER)).toBeUndefined()
 
@@ -49,9 +49,7 @@ describe('OpenAICodexCredentialStore', () => {
     expect(await auth.read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'access-secret' })
     if (process.platform !== 'win32') expect((await stat(auth.filename)).mode & 0o777).toBe(0o600)
 
-    expect(await auth.listProfiles()).toMatchObject([
-      { label: 'Default', active: true },
-    ])
+    expect(await auth.listProfiles()).toMatchObject([{ label: 'Default' }])
 
     await auth.delete(OPENAI_CODEX_PROVIDER)
     expect(await auth.list()).toEqual([])
@@ -80,7 +78,7 @@ describe('OpenAICodexCredentialStore', () => {
 
   it('rejects malformed and over-broad documents without echoing their contents', async () => {
     const auth = await store()
-    await writeFile(auth.filename, '{"version":1,"activeProfileId":"one","profiles":[{"id":"one","label":"Main","createdAt":1,"updatedAt":1,"credential":{"type":"oauth","access":"leaked-secret"}}]}', { mode: 0o600 })
+    await writeFile(auth.filename, '{"version":2,"profiles":[{"id":"one","label":"Main","createdAt":1,"updatedAt":1,"credential":{"type":"oauth","access":"leaked-secret"}}]}', { mode: 0o600 })
     const failure = await auth.read(OPENAI_CODEX_PROVIDER).catch((error: unknown) => error)
     expect(failure).toBeInstanceOf(Error)
     expect(String(failure)).toContain('refresh')
@@ -88,8 +86,7 @@ describe('OpenAICodexCredentialStore', () => {
 
     if (process.platform !== 'win32') {
       await writeFile(auth.filename, JSON.stringify({
-        version: 1,
-        activeProfileId: 'one',
+        version: 2,
         profiles: [{ id: 'one', label: 'Main', createdAt: 1, updatedAt: 1, credential: credential() }],
       }), { mode: 0o644 })
       await chmod(auth.filename, 0o644)
@@ -100,29 +97,48 @@ describe('OpenAICodexCredentialStore', () => {
   it('writes the versioned document and refuses provider ids it does not own', async () => {
     const auth = await store()
     await auth.modify(OPENAI_CODEX_PROVIDER, () => Promise.resolve(credential()))
-    expect(JSON.parse(await readFile(auth.filename, 'utf8'))).toMatchObject({
-      version: 1,
+    const document: unknown = JSON.parse(await readFile(auth.filename, 'utf8'))
+    expect(document).toMatchObject({
+      version: 2,
       profiles: [{ credential: { type: 'oauth', accountId: 'account-1' } }],
     })
+    expect(document).not.toHaveProperty('activeProfileId')
     await expect(auth.modify('other', () => Promise.resolve(credential())))
       .rejects.toThrow(/does not own provider/)
     expect(await auth.read('other')).toBeUndefined()
   })
 
-  it('keeps named profiles separate and changes only by explicit activation', async () => {
+  it('rejects the obsolete manual-default profile document', async () => {
+    const auth = await store()
+    await writeFile(auth.filename, JSON.stringify({
+      version: 1,
+      activeProfileId: 'one',
+      profiles: [],
+    }), { mode: 0o600 })
+
+    await expect(auth.listProfiles()).rejects.toThrow(/unsupported auth format version 1/)
+  })
+
+  it('keeps named profiles separate and persists the global allocation priority as order', async () => {
     const auth = await store()
     const first = await auth.addProfile('Personal', credential('first'))
     const second = await auth.addProfile('Work', { ...credential('second'), accountId: 'account-2' })
 
     expect(await auth.listProfiles()).toEqual([
-      expect.objectContaining({ id: first.id, label: 'Personal', active: true }),
-      expect.objectContaining({ id: second.id, label: 'Work', active: false }),
+      expect.objectContaining({ id: first.id, label: 'Personal' }),
+      expect.objectContaining({ id: second.id, label: 'Work' }),
     ])
     expect(await auth.read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'first' })
 
-    await auth.setActiveProfile(second.id)
+    await auth.prioritizeProfile(second.id)
+    expect(await auth.listProfiles()).toEqual([
+      expect.objectContaining({ id: second.id, label: 'Work' }),
+      expect.objectContaining({ id: first.id, label: 'Personal' }),
+    ])
     expect(await auth.read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'second' })
+    expect(await auth.forProfile(second.id).read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'second' })
     expect(await auth.forProfile(first.id).read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'first' })
+    await expect(auth.prioritizeProfile('missing')).rejects.toThrow(/profile does not exist/)
 
     await expect(auth.addProfile(' work ', { ...credential('third'), accountId: 'account-3' }))
       .resolves.toMatchObject({ label: 'work' })
@@ -146,25 +162,36 @@ describe('OpenAICodexCredentialStore', () => {
     ])
   })
 
-  it('pins each session to its first resolved profile without automatic switching', async () => {
+  it('binds once and replaces only the expected current profile', async () => {
     let sessionId: string | undefined = 'session-a'
     const auth = await store()
     const sessionStore = new OpenAICodexCredentialStore(auth.filename, () => sessionId)
     const first = await auth.addProfile('First', credential('first'))
     const second = await auth.addProfile('Second', { ...credential('second'), accountId: 'account-2' })
 
-    expect(await sessionStore.read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'first' })
-    await auth.setActiveProfile(second.id)
+    await sessionStore.bindSessionProfile('session-a', first.id)
     expect(await sessionStore.read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'first' })
 
     sessionId = 'session-b'
+    await sessionStore.bindSessionProfile('session-b', second.id)
     expect(await sessionStore.read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'second' })
+    await sessionStore.bindSessionProfile('session-b', first.id)
+    expect(await sessionStore.read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'second' })
+    expect(await sessionStore.replaceSessionProfile('session-b', second.id, first.id)).toEqual({
+      profileId: first.id,
+      replaced: true,
+    })
+    expect(await sessionStore.read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'first' })
+    expect(await sessionStore.replaceSessionProfile('session-b', second.id, second.id)).toEqual({
+      profileId: first.id,
+      replaced: false,
+    })
     await sessionStore.modify(OPENAI_CODEX_PROVIDER, current => Promise.resolve({
       ...(current as OAuthCredential),
-      access: 'second-refreshed',
+      access: 'first-refreshed',
     }))
-    expect(await auth.forProfile(second.id).read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'second-refreshed' })
-    expect(await auth.forProfile(first.id).read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'first' })
+    expect(await auth.forProfile(first.id).read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'first-refreshed' })
+    expect(await auth.forProfile(second.id).read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'second' })
   })
 
   it('imports the prior single-account file without modifying or deleting it', async () => {
@@ -175,7 +202,7 @@ describe('OpenAICodexCredentialStore', () => {
 
     expect(await auth.read(OPENAI_CODEX_PROVIDER)).toMatchObject({ access: 'legacy' })
     expect(await auth.listProfiles()).toEqual([
-      expect.objectContaining({ label: 'Imported account', active: true }),
+      expect.objectContaining({ label: 'Imported account' }),
     ])
     expect(await readFile(legacyFilename, 'utf8')).toBe(legacyText)
 

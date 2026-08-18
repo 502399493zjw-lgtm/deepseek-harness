@@ -26,7 +26,7 @@ import {
 const STATUS_PATH = '/plugins/dsh-openai-codex/profiles'
 const LOGIN_PATH = '/plugins/dsh-openai-codex/profiles/login'
 const CANCEL_LOGIN_PATH = '/plugins/dsh-openai-codex/profiles/login/cancel'
-const ACTIVATE_PATH = '/plugins/dsh-openai-codex/profiles/activate'
+const PRIORITY_PATH = '/plugins/dsh-openai-codex/profiles/priority'
 const REMOVE_PATH = '/plugins/dsh-openai-codex/profiles/remove'
 const IMAGE_TOOLS_PATH = '/plugins/dsh-openai-codex/image-tools'
 const NETWORK_PATH = '/plugins/dsh-openai-codex/network'
@@ -42,7 +42,6 @@ type AccountStatus =
 interface AccountProfile {
   id: string
   label: string
-  active: boolean
   createdAt: number
   updatedAt: number
   usage: OpenAICodexUsage
@@ -241,12 +240,13 @@ async function jsonRequest<T>(path: string, method = 'GET', body?: unknown): Pro
 
 type AccountDialog = 'remove'
 
-/** OpenAI Codex account status and OAuth actions. */
+/** OpenAI Codex account status, global allocation priority, and OAuth actions. */
 export function OpenAICodexSettings({ t }: OpenAICodexSettingsProps) {
   if (t === undefined) throw new Error('OpenAI Codex settings requires its translation function')
   const [status, setStatus] = useState<AccountStatus>({ status: 'loading' })
   const [busy, setBusy] = useState(false)
   const [selectedProfileId, setSelectedProfileId] = useState<string>()
+  const [priorityError, setPriorityError] = useState<string>()
   const [dialog, setDialog] = useState<AccountDialog>()
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [imageTools, setImageTools] = useState<ImageToolPreferences | undefined>()
@@ -338,15 +338,14 @@ export function OpenAICodexSettings({ t }: OpenAICodexSettingsProps) {
     if (status.status !== 'ready') return
     setSelectedProfileId((current) => {
       if (current !== undefined && status.profiles.some(profile => profile.id === current)) return current
-      return status.profiles.find(profile => profile.active)?.id ?? status.profiles[0]?.id
+      return status.profiles[0]?.id
     })
   }, [status])
 
   const profiles = status.status === 'ready' ? status.profiles : []
   const selectedProfile = profiles.find(profile => profile.id === selectedProfileId)
-    ?? profiles.find(profile => profile.active)
     ?? profiles[0]
-  const activeProfile = profiles.find(profile => profile.active)
+  const priorityProfile = profiles[0]
 
   const signIn = async (): Promise<void> => {
     stopPopupWatch()
@@ -388,13 +387,18 @@ export function OpenAICodexSettings({ t }: OpenAICodexSettingsProps) {
     }
   }
 
-  const activateProfile = async (profileId: string): Promise<void> => {
+  const prioritizeProfile = async (profileId: string): Promise<void> => {
     setBusy(true)
+    setPriorityError(undefined)
     try {
-      await jsonRequest<{ ok: true }>(ACTIVATE_PATH, 'POST', { profileId })
-      await refresh()
-    } catch (error: unknown) {
-      setStatus({ status: 'error', message: error instanceof Error ? error.message : t('requestFailed') })
+      await jsonRequest<{ ok: true }>(PRIORITY_PATH, 'POST', { profileId })
+      const nextStatus = await jsonRequest<AccountStatus>(STATUS_PATH)
+      if (nextStatus.status !== 'ready' || nextStatus.profiles[0]?.id !== profileId) {
+        throw new Error(t('profilePriorityFailed'))
+      }
+      setStatus(nextStatus)
+    } catch {
+      setPriorityError(t('profilePriorityFailed'))
     } finally {
       setBusy(false)
     }
@@ -478,12 +482,10 @@ export function OpenAICodexSettings({ t }: OpenAICodexSettingsProps) {
         .dsh-codex-detail-title { margin: 0; color: var(--dsw-alias-label-primary); font-size: 20px; line-height: 28px; font-weight: 600; }
         .dsh-codex-account-status { display: inline-flex; align-items: center; gap: 7px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }
         .dsh-codex-account-status[data-state='error'] { color: var(--dsw-alias-state-error-primary); }
-        .dsh-codex-default { margin-top: 24px; }
-        .dsh-codex-default label { display: block; margin-bottom: 9px; color: var(--dsw-alias-label-primary); font-size: 14px; line-height: 20px; font-weight: 600; }
-        .dsh-codex-select-wrap { position: relative; }
-        .dsh-codex-select-wrap select { width: 100%; min-height: 42px; appearance: none; padding: 8px 38px 8px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 9px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-1); cursor: pointer; }
-        .dsh-codex-select-wrap svg { position: absolute; top: 50%; right: 12px; color: var(--dsw-alias-label-tertiary); pointer-events: none; transform: translateY(-50%); }
+        .dsh-codex-default { margin-top: 18px; }
+        .dsh-codex-default-action { min-width: 112px; justify-content: center; }
         .dsh-codex-default p { margin: 8px 0 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 20px; }
+        .dsh-codex-default p[role='alert'] { color: var(--dsw-alias-state-error-primary); }
         .dsh-codex-quota { margin-top: 26px; padding: 24px 0 28px; border-top: 1px solid var(--dsw-alias-border-l2); }
         .dsh-codex-detail-actions { display: grid; grid-template-columns: 1fr 1fr; min-height: 60px; margin: auto -26px 0; border-top: 1px solid var(--dsw-alias-border-l2); }
         .dsh-codex-detail-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; color: var(--dsw-alias-state-business-primary, #3964fe); background: transparent; cursor: pointer; }
@@ -550,11 +552,14 @@ export function OpenAICodexSettings({ t }: OpenAICodexSettingsProps) {
                 className="dsh-codex-profile-item"
                 data-selected={profile.id === selectedProfile?.id}
                 aria-current={profile.id === selectedProfile?.id ? 'true' : undefined}
-                onClick={() => { setSelectedProfileId(profile.id) }}
+                onClick={() => {
+                  setSelectedProfileId(profile.id)
+                  setPriorityError(undefined)
+                }}
               >
                 <StateDot state={profile.quotaError === undefined ? 'done' : 'error'} size={9} />
                 <span className="dsh-codex-profile-name">{profile.label}</span>
-                {profile.active ? <span style={badgeStyle}>{t('defaultProfile')}</span> : null}
+                {profile.id === priorityProfile?.id ? <span style={badgeStyle}>{t('priorityProfile')}</span> : null}
               </button>
             ))}
           </div>
@@ -587,19 +592,16 @@ export function OpenAICodexSettings({ t }: OpenAICodexSettingsProps) {
               </span>
             </div>
             <div className="dsh-codex-default">
-              <label htmlFor="dsh-codex-default-profile">{t('defaultForNewChats')}</label>
-              <div className="dsh-codex-select-wrap">
-                <select
-                  id="dsh-codex-default-profile"
-                  value={activeProfile?.id ?? selectedProfile.id}
-                  disabled={busy}
-                  onChange={(event) => { void activateProfile(event.target.value) }}
-                >
-                  {profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.label}</option>)}
-                </select>
-                <IconChevronDownOutline14 />
-              </div>
-              <p>{t('defaultProfileHint')}</p>
+              <Button
+                className="dsh-codex-default-action"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => { void prioritizeProfile(selectedProfile.id) }}
+              >
+                {t('setPriorityProfile')}
+              </Button>
+              {priorityError === undefined ? null : <p role="alert">{priorityError}</p>}
             </div>
             <div className="dsh-codex-quota">
               <UsageLimits
